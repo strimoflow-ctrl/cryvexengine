@@ -22,3 +22,5 @@ bots/
 Thumbs.db
 .vscode/
 .idea/
+
+*.zip
