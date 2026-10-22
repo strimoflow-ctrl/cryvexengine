@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bideo Automation Studio | YouTube Auto-Sync & Multi-Channel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- BACKGROUND AMBIENT GLOWS -->
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="glow-orb orb-3"></div>
+
+  <!-- AUTH SCREEN (FIRST-TIME OR ADDING ACCOUNT) -->
+  <div id="authScreen" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="brand-header">
+        <div class="brand-logo">
+          <span>▶</span>
+        </div>
+        <h1>Bideo <span>Studio</span></h1>
+        <p>Login with your Bideo App phone number & password</p>
+      </div>
+
+      <div id="authError" class="alert-box error hidden"></div>
+
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginInput">Phone Number or Username</label>
+          <div class="input-wrapper">
+            <span class="input-icon">📱</span>
+            <input type="text" id="loginInput" placeholder="e.g. 9876543210 or username" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="passwordInput">Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="passwordInput" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-block">
+          <span class="btn-text">Connect to My Channel</span>
+          <span class="spinner hidden"></span>
+        </button>
+
+        <button type="button" id="cancelLoginBtn" class="btn btn-secondary btn-block hidden" style="margin-top: 10px;">
+          Cancel
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p>🔒 100% Direct connection with official Bideo Server</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN STUDIO APP (SHOWN WHEN LOGGED IN) -->
+  <div id="appScreen" class="app-wrapper hidden">
+    
+    <!-- TOP NAVIGATION -->
+    <header class="studio-nav">
+      <div class="nav-brand">
+        <div class="mini-logo">▶</div>
+        <div class="brand-text-col">
+          <h2>Bideo <span>Automation Studio</span></h2>
+          <span class="sub-badge">Firebase Synced • 1080p Engine</span>
+        </div>
+      </div>
+
+      <!-- TABS SWITCHER -->
+      <nav class="nav-tabs">
+        <button id="tabAutomationBtn" class="nav-tab active">
+          <span>🤖 YouTube Automation Hub</span>
+        </button>
+        <button id="tabUploadBtn" class="nav-tab">
+          <span>📤 Direct PC Upload</span>
+        </button>
+      </nav>
+
+      <!-- MULTI-ACCOUNT SWITCHER & CONTROLS -->
+      <div class="nav-user">
+        <div class="account-switcher-dropdown">
+          <button id="accountMenuBtn" class="account-selector-btn" title="Switch Bideo Account">
+            <img id="navAvatar" src="https://via.placeholder.com/34" alt="Avatar" class="channel-avatar">
+            <div class="channel-info">
+              <span id="navName" class="channel-name">Loading...</span>
+              <span id="navHandle" class="channel-handle">@channel</span>
+            </div>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+
+          <!-- DROPDOWN MENU -->
+          <div id="accountDropdownMenu" class="account-dropdown-menu hidden">
+            <div class="dropdown-header">Switch Bideo Channel</div>
+            <div id="accountsListDropdown" class="accounts-dropdown-list">
+              <!-- Dynamically Populated with saved Bideo accounts -->
+            </div>
+            <div class="dropdown-divider"></div>
+            <button id="addAccountBtn" class="dropdown-item add-acc-btn">
+              <span>➕ Add Another Bideo Channel</span>
+            </button>
+            <button id="logoutBtn" class="dropdown-item logout-acc-btn">
+              <span>🚪 Logout Current Channel</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="studio-container">
+      
+      <!-- ========================================================
+           TAB 1: YOUTUBE AUTOMATION PIPELINE (CORE HUB)
+      ======================================================== -->
+      <section id="automationSection" class="dashboard-section">
+        
+        <!-- TOP STATS BAR -->
+        <div class="stats-overview-grid">
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper orange">📺</div>
+            <div>
+              <div class="stat-val" id="statActivePairings">0</div>
+              <div class="stat-lbl">Active YouTube Channels</div>
+            </div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper green">🚀</div>
+            <div>
+              <div class="stat-val" id="statTotalPosted">0</div>
+              <div class="stat-lbl">1080p Videos Published</div>
+            </div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-icon-wrapper purple">⏱️</div>
+            <div>
+              <div class="stat-val">Every 30m</div>
+              <div class="stat-lbl">Auto-Post Cycle (Active)</div>
+            </div>
+          </div>
+          <div class="stat-card glass-card action-card">
+            <button id="syncAllBtn" class="btn btn-primary btn-block">
+              <span class="btn-text">⚡ Run Master Sync Now</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="automation-two-col">
+          
+          <!-- LEFT COLUMN: CONNECT NEW YOUTUBE CHANNEL -->
+          <div class="card glass-card connect-card">
+            <div class="card-header">
+              <div class="badge-icon yt-badge">▶</div>
+              <div>
+                <h3>Connect YouTube Channel</h3>
+                <p>Auto-download new & backlog videos in 1080p with identical Title & Description</p>
+              </div>
+            </div>
+
+            <div id="pairingAlert" class="alert-box hidden"></div>
+
+            <form id="pairingForm" class="pairing-form">
+              <div class="form-group">
+                <label for="ytChannelInput">YouTube Channel URL or @Handle <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔗</span>
+                  <input type="text" id="ytChannelInput" placeholder="e.g. @MrBeast or https://youtube.com/@channel" required>
+                </div>
+                <p class="helper-text">Channel ka handle (@name) ya full URL paste karein.</p>
+              </div>
+
+              <div class="form-group">
+                <label for="pairingBideoSelect">Target Bideo Account <span class="required">*</span></label>
+                <select id="pairingBideoSelect" required>
+                  <option value="">Loading accounts...</option>
+                </select>
+                <p class="helper-text">Is YouTube channel ke videos kis Bideo account pe upload hone chahiye?</p>
+              </div>
+
+              <div class="form-group">
+                <label for="pairingCategorySelect">Default Bideo Category</label>
+                <select id="pairingCategorySelect">
+                  <option value="">Loading categories...</option>
+                </select>
+              </div>
+
+              <button type="submit" id="savePairingBtn" class="btn btn-primary btn-lg btn-block">
+                <span class="btn-text">➕ Connect & Activate Automation</span>
+                <span class="spinner hidden"></span>
+              </button>
+            </form>
+
+            <div class="features-pill-row">
+              <span class="feature-tag">✨ Zero Duplicate Check (Firebase)</span>
+              <span class="feature-tag">💎 Crisp 1080p MP4</span>
+              <span class="feature-tag">🧹 Immediate Disk Cleanup</span>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: CONNECTED CHANNELS LIST -->
+          <div class="card glass-card pairings-list-card">
+            <div class="card-header space-between">
+              <div>
+                <h3>Active Channel Automations</h3>
+                <p>Manage your linked YouTube and Bideo channel pairs</p>
+              </div>
+              <button id="refreshPairingsBtn" class="btn btn-secondary btn-sm" title="Refresh List">🔄 Refresh</button>
+            </div>
+
+            <div id="pairingsContainer" class="pairings-grid">
+              <div class="empty-state">No YouTube channels linked yet. Add your first channel on the left!</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- FULL-WIDTH LIVE AUTOMATION LOG VIEWER -->
+        <div class="card glass-card logs-card">
+          <div class="card-header space-between">
+            <div class="flex-align-center">
+              <div class="badge-icon log-badge">📜</div>
+              <div>
+                <h3>Live Automation & Activity Logs</h3>
+                <p>Real-time log of YouTube video downloads, 1080p processing, and Bideo publishing</p>
+              </div>
+            </div>
+            <button id="refreshLogsBtn" class="btn btn-secondary btn-sm">🔄 Refresh Logs</button>
+          </div>
+
+          <div id="logsList" class="logs-container">
+            <div class="empty-state">Connecting to Firebase Realtime Database...</div>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- ========================================================
+           TAB 2: DIRECT MANUAL PC UPLOAD (EXISTING SUITE)
+      ======================================================== -->
+      <section id="uploadSection" class="dashboard-section hidden">
+        <div class="studio-two-col">
+          
+          <!-- LEFT: UPLOAD SUITE -->
+          <div class="upload-suite">
+            <div class="card glass-card">
+              <div class="card-header">
+                <div class="badge-icon">📤</div>
+                <div>
+                  <h3>Publish Video to Current Channel</h3>
+                  <p>Upload directly from PC — reflects live in active Bideo account</p>
+                </div>
+              </div>
+
+              <div id="uploadAlert" class="alert-box hidden"></div>
+
+              <form id="uploadForm" class="upload-form">
+                
+                <!-- VIDEO DROPZONE -->
+                <div class="form-group">
+                  <label>Select Video File (MP4, WebM, MOV)</label>
+                  <div id="videoDropzone" class="dropzone">
+                    <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/quicktime" class="file-input-hidden">
+                    <div class="dropzone-content">
+                      <div class="drop-icon">🎬</div>
+                      <h4 id="dropzoneText">Drag & Drop video file here, or <span>Browse PC</span></h4>
+                      <p id="dropzoneSubtext">Supports 1080p, 4K, Shorts & Long videos</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- LIVE VIDEO PREVIEW -->
+                <div id="videoPreviewContainer" class="video-preview-wrapper hidden">
+                  <video id="videoPreview" controls class="preview-player"></video>
+                  <div class="video-meta-tag">
+                    <span id="metaDuration">⏳ 00:00</span>
+                    <span id="metaDimensions">📐 1080x1920</span>
+                    <span id="metaTypeBadge" class="badge">Short / Reel</span>
+                  </div>
+                </div>
+
+                <!-- TITLE & DESCRIPTION -->
+                <div class="form-group">
+                  <label for="videoTitle">Video Title <span class="required">*</span></label>
+                  <input type="text" id="videoTitle" placeholder="Enter an engaging video title..." required>
+                </div>
+
+                <div class="form-group">
+                  <label for="videoDescription">Description & Hashtags</label>
+                  <textarea id="videoDescription" rows="4" placeholder="Describe your video, add #tags and credits..."></textarea>
+                </div>
+
+                <!-- METADATA ROW -->
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label for="categorySelect">Category <span class="required">*</span></label>
+                    <select id="categorySelect" required>
+                      <option value="">Loading categories...</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group col">
+                    <label for="uploadTypeSelect">Format</label>
+                    <select id="uploadTypeSelect">
+                      <option value="auto">⚡ Auto-Detect (Aspect Ratio)</option>
+                      <option value="short">📱 Short / Reel (9:16)</option>
+                      <option value="video">📺 Long Video (16:9)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- CUSTOM THUMBNAIL -->
+                <div class="form-group">
+                  <label>Custom Thumbnail <span class="badge optional">Optional (Auto-generated if empty)</span></label>
+                  <div class="thumb-picker">
+                    <input type="file" id="thumbFileInput" accept="image/jpeg,image/png,image/webp">
+                    <p class="helper-text">💡 Agar thumbnail nahi chunte, FFmpeg automatically 1-second mark se HD thumbnail capture kar lega.</p>
+                  </div>
+                </div>
+
+                <!-- UPLOAD PROGRESS -->
+                <div id="uploadProgressBox" class="progress-box hidden">
+                  <div class="progress-header">
+                    <span id="progressStatusText">⚡ Uploading to Bideo server...</span>
+                    <span id="progressPercent">0%</span>
+                  </div>
+                  <div class="progress-bar-bg">
+                    <div id="progressBarFill" class="progress-bar-fill"></div>
+                  </div>
+                </div>
+
+                <!-- SUBMIT BUTTON -->
+                <button type="submit" id="submitUploadBtn" class="btn btn-primary btn-lg btn-block">
+                  <span class="btn-text">🚀 Publish Video Directly to Channel</span>
+                  <span class="spinner hidden"></span>
+                </button>
+
+              </form>
+            </div>
+          </div>
+
+          <!-- RIGHT: CHANNEL INFO & RECENT UPLOADS -->
+          <aside class="studio-sidebar">
+            <div class="card glass-card channel-card">
+              <div class="card-title">Active Bideo Channel</div>
+              <div class="channel-card-body">
+                <img id="sideAvatar" src="https://via.placeholder.com/80" alt="Channel Avatar" class="big-avatar">
+                <h3 id="sideChannelName">My Channel</h3>
+                <span id="sideHandle" class="handle-badge">@handle</span>
+                
+                <div class="stats-row">
+                  <div class="stat-item">
+                    <span class="stat-number" id="sideFollowers">0</span>
+                    <span class="stat-label">Followers</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-number" id="sideStatus">Verified</span>
+                    <span class="stat-label">Channel</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- RECENT UPLOADS SESSION LOG -->
+            <div class="card glass-card recent-card">
+              <div class="card-title">Uploaded in This Session</div>
+              <div id="recentUploadsList" class="recent-list">
+                <div class="empty-state">Abhi tak koi video upload nahi hui hai.</div>
+              </div>
+            </div>
+          </aside>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

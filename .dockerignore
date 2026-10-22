@@ -1,0 +1,6 @@
+.git
+__pycache__
+*.pyc
+Bideo.apk
+bots/
+*.bat

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Large APK / Binary files
+Bideo.apk
+*.apk
+
+# Local bots (managed locally via Desktop launcher)
+bots/
+*.bat
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
