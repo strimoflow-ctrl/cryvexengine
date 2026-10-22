@@ -93,10 +93,16 @@ class AutomationScheduler:
             print(f"[Sync Notice] {msg}")
             return False, msg
 
-        # Update pairing channel name in Firebase if changed
+        # Update pairing channel name and canonical URL in Firebase if changed or resolved
+        updates = {}
         if channel_meta.get("channel_name") and channel_meta["channel_name"] != yt_name:
-            FirebaseClient.update_pairing(pairing_id, {"yt_channel_name": channel_meta["channel_name"]})
+            updates["yt_channel_name"] = channel_meta["channel_name"]
             yt_name = channel_meta["channel_name"]
+        if channel_meta.get("channel_url") and channel_meta["channel_url"] != yt_channel_url:
+            updates["yt_channel_url"] = channel_meta["channel_url"]
+            yt_channel_url = channel_meta["channel_url"]
+        if updates:
+            FirebaseClient.update_pairing(pairing_id, updates)
 
         # 3. Find candidate unposted video (checks Firebase for duplicate prevention)
         unposted_video = None

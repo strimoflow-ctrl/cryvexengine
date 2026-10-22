@@ -80,6 +80,9 @@
         <button id="tabAutomationBtn" class="nav-tab active">
           <span>🤖 YouTube Automation Hub</span>
         </button>
+        <button id="tabSingleLinkBtn" class="nav-tab">
+          <span>🔗 Instant Link Uploader</span>
+        </button>
         <button id="tabUploadBtn" class="nav-tab">
           <span>📤 Direct PC Upload</span>
         </button>
@@ -245,7 +248,105 @@
 
 
       <!-- ========================================================
-           TAB 2: DIRECT MANUAL PC UPLOAD (EXISTING SUITE)
+           TAB 2: INSTANT SINGLE VIDEO LINK UPLOADER (<500MB SAFEGUARD)
+      ======================================================== -->
+      <section id="singleLinkSection" class="dashboard-section hidden">
+        <div class="studio-two-col">
+          
+          <div class="card glass-card">
+            <div class="card-header">
+              <div class="badge-icon orange">⚡</div>
+              <div>
+                <h3>Instant Single YouTube Link Uploader</h3>
+                <p>Paste any YouTube Video or Shorts URL — downloads & publishes directly to selected Bideo channel</p>
+              </div>
+            </div>
+
+            <!-- STORAGE SAFEGUARD BANNER -->
+            <div class="safeguard-banner">
+              <div class="safeguard-icon">🛡️</div>
+              <div class="safeguard-info">
+                <strong>Storage Safeguard Active (&lt; 500 MB Strict Limit)</strong>
+                <p>Agar video 500MB se badi hoti hai, to bot automatically resolution 1080p se 720p/480p me compress karke size 500MB ke under rakhega taaki container storage safe rahe.</p>
+              </div>
+            </div>
+
+            <div id="singleLinkAlert" class="alert-box hidden"></div>
+
+            <form id="singleLinkForm" class="pairing-form">
+              <div class="form-group">
+                <label for="singleVideoUrl">YouTube Video / Shorts Link <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔗</span>
+                  <input type="url" id="singleVideoUrl" placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/... or shorts" required>
+                </div>
+                <p class="helper-text">Kewal ek video ya shorts ka link yahan paste karein.</p>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="singleBideoSelect">Target Bideo Account <span class="required">*</span></label>
+                  <select id="singleBideoSelect" required>
+                    <option value="">Loading accounts...</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="singleCategorySelect">Bideo Category</label>
+                  <select id="singleCategorySelect">
+                    <option value="">Loading categories...</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="singleCustomTitle">Custom Title (Optional)</label>
+                <input type="text" id="singleCustomTitle" placeholder="Leave blank to use original YouTube title automatically">
+              </div>
+
+              <div class="form-group">
+                <label for="singleCustomDesc">Custom Description (Optional)</label>
+                <textarea id="singleCustomDesc" rows="3" placeholder="Leave blank to use original YouTube description automatically"></textarea>
+              </div>
+
+              <button type="submit" id="singleLinkSubmitBtn" class="btn btn-primary btn-lg btn-block">
+                <span class="btn-text">🚀 Download &amp; Upload to Bideo Now</span>
+                <span class="spinner hidden"></span>
+              </button>
+            </form>
+
+            <div class="features-pill-row">
+              <span class="feature-tag">🛡️ Under 500MB Guarantee</span>
+              <span class="feature-tag">💎 Auto 1080p / 720p Adaptive</span>
+              <span class="feature-tag">🔥 Instant Background Cleanup</span>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: SINGLE UPLOAD RESULT / LIVE STATUS -->
+          <div class="card glass-card">
+            <div class="card-header">
+              <div class="badge-icon green">📊</div>
+              <div>
+                <h3>Upload Status &amp; Live Result</h3>
+                <p>Track your single video download, compression, and Bideo publishing</p>
+              </div>
+            </div>
+
+            <div id="singleUploadStatusBox" class="single-status-box">
+              <div class="status-placeholder">
+                <div class="status-icon">🎬</div>
+                <h4>Ready to Upload Single Video</h4>
+                <p>Paste a YouTube link on the left and click "Upload to Bideo Now" to see real-time progress and final details here.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ========================================================
+           TAB 3: DIRECT MANUAL PC UPLOAD (EXISTING SUITE)
       ======================================================== -->
       <section id="uploadSection" class="dashboard-section hidden">
         <div class="studio-two-col">

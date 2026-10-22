@@ -14,9 +14,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tabs
   const tabAutomationBtn = document.getElementById('tabAutomationBtn');
+  const tabSingleLinkBtn = document.getElementById('tabSingleLinkBtn');
   const tabUploadBtn = document.getElementById('tabUploadBtn');
   const automationSection = document.getElementById('automationSection');
+  const singleLinkSection = document.getElementById('singleLinkSection');
   const uploadSection = document.getElementById('uploadSection');
+
+  // Single Link Form Elements
+  const singleLinkForm = document.getElementById('singleLinkForm');
+  const singleVideoUrl = document.getElementById('singleVideoUrl');
+  const singleBideoSelect = document.getElementById('singleBideoSelect');
+  const singleCategorySelect = document.getElementById('singleCategorySelect');
+  const singleCustomTitle = document.getElementById('singleCustomTitle');
+  const singleCustomDesc = document.getElementById('singleCustomDesc');
+  const singleLinkSubmitBtn = document.getElementById('singleLinkSubmitBtn');
+  const singleLinkAlert = document.getElementById('singleLinkAlert');
+  const singleUploadStatusBox = document.getElementById('singleUploadStatusBox');
 
   // Nav Profile & Account Dropdown
   const accountMenuBtn = document.getElementById('accountMenuBtn');
@@ -87,19 +100,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // -----------------------------------------------------------
   // Tab Switching
   // -----------------------------------------------------------
-  tabAutomationBtn.addEventListener('click', () => {
-    tabAutomationBtn.classList.add('active');
-    tabUploadBtn.classList.remove('active');
-    automationSection.classList.remove('hidden');
-    uploadSection.classList.add('hidden');
-  });
+  function switchTab(tab) {
+    tabAutomationBtn.classList.toggle('active', tab === 'automation');
+    if (tabSingleLinkBtn) tabSingleLinkBtn.classList.toggle('active', tab === 'single');
+    tabUploadBtn.classList.toggle('active', tab === 'upload');
 
-  tabUploadBtn.addEventListener('click', () => {
-    tabUploadBtn.classList.add('active');
-    tabAutomationBtn.classList.remove('active');
-    uploadSection.classList.remove('hidden');
-    automationSection.classList.add('hidden');
-  });
+    automationSection.classList.toggle('hidden', tab !== 'automation');
+    if (singleLinkSection) singleLinkSection.classList.toggle('hidden', tab !== 'single');
+    uploadSection.classList.toggle('hidden', tab !== 'upload');
+  }
+
+  tabAutomationBtn.addEventListener('click', () => switchTab('automation'));
+  if (tabSingleLinkBtn) tabSingleLinkBtn.addEventListener('click', () => switchTab('single'));
+  tabUploadBtn.addEventListener('click', () => switchTab('upload'));
 
   // -----------------------------------------------------------
   // Multi-Account Switcher Dropdown
@@ -245,6 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function populatePairingAccountSelect() {
     pairingBideoSelect.innerHTML = '<option value="">-- Target Bideo Account Chunein --</option>';
+    if (singleBideoSelect) singleBideoSelect.innerHTML = '<option value="">-- Target Bideo Account Chunein --</option>';
+
     savedAccounts.forEach(acc => {
       const opt = document.createElement('option');
       opt.value = acc._id;
@@ -253,6 +268,11 @@ document.addEventListener('DOMContentLoaded', () => {
         opt.selected = true;
       }
       pairingBideoSelect.appendChild(opt);
+
+      if (singleBideoSelect) {
+        const optSingle = opt.cloneNode(true);
+        singleBideoSelect.appendChild(optSingle);
+      }
     });
   }
 
@@ -332,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate manual upload select
         categorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
         pairingCategorySelect.innerHTML = '<option value="">-- Default Category Chunein (Optional) --</option>';
+        if (singleCategorySelect) singleCategorySelect.innerHTML = '<option value="">-- Category Chunein (Optional) --</option>';
 
         data.categories.forEach(cat => {
           const opt1 = document.createElement('option');
@@ -343,6 +364,13 @@ document.addEventListener('DOMContentLoaded', () => {
           opt2.value = cat._id;
           opt2.textContent = cat.name;
           pairingCategorySelect.appendChild(opt2);
+
+          if (singleCategorySelect) {
+            const opt3 = document.createElement('option');
+            opt3.value = cat._id;
+            opt3.textContent = cat.name;
+            singleCategorySelect.appendChild(opt3);
+          }
         });
       }
     } catch (e) {
@@ -411,9 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <div class="pairing-meta-row">
-          <span>📤 Total Published: <b>${totalPosted} videos</b></span>
-          <span>Last Post: ${lastPosted}</span>
-          <span>Category: ${p.category_name || 'Default'}</span>
+          <span>📤 Published to Bideo: <b>${totalPosted} videos</b></span>
+          <span>Last Post: <b>${lastPosted}</b></span>
+          <span>Category: <b>${p.category_name || 'Default'}</b></span>
         </div>
       `;
 
@@ -492,10 +520,18 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.message || 'Channel link nahi ho saka.');
       }
 
-      showPairingAlert(`🎉 YouTube Channel '${data.pairing.yt_channel_name}' Bideo ke sath connect ho gaya! Har 30 min me automatic upload hoga.`, 'success');
+      showPairingAlert(`🎉 YouTube Channel '${data.pairing.yt_channel_name}' Bideo ke sath connect ho gaya! Pehla video download aur upload shuru ho chuka hai.`, 'success');
       ytChannelInput.value = '';
       loadPairings();
       loadLogs();
+
+      // Trigger immediate first video download & upload!
+      if (data.pairing && data.pairing.id) {
+        fetch(`/api/pairings/${data.pairing.id}/sync`, { method: 'POST' }).then(() => {
+          setTimeout(loadLogs, 3000);
+          setTimeout(loadPairings, 6000);
+        }).catch(() => {});
+      }
 
     } catch (err) {
       showPairingAlert(err.message, 'error');
@@ -539,6 +575,128 @@ document.addEventListener('DOMContentLoaded', () => {
       syncAllBtn.disabled = false;
     }
   });
+
+  // -----------------------------------------------------------
+  // Instant Single YouTube Video / Shorts Link Uploader
+  // -----------------------------------------------------------
+  if (singleLinkForm) {
+    singleLinkForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      singleLinkAlert.classList.add('hidden');
+
+      const videoUrl = singleVideoUrl.value.trim();
+      const bideoUserId = singleBideoSelect.value;
+      const categoryId = singleCategorySelect.value;
+      const customTitle = singleCustomTitle.value.trim();
+      const customDesc = singleCustomDesc.value.trim();
+
+      if (!videoUrl) {
+        showSingleAlert('YouTube Video URL daalna zaroori hai!', 'error');
+        return;
+      }
+      if (!bideoUserId) {
+        showSingleAlert('Kripya target Bideo account chunein!', 'error');
+        return;
+      }
+
+      const btnText = singleLinkSubmitBtn.querySelector('.btn-text');
+      const spinner = singleLinkSubmitBtn.querySelector('.spinner');
+
+      btnText.textContent = 'Processing & Uploading...';
+      spinner.classList.remove('hidden');
+      singleLinkSubmitBtn.disabled = true;
+
+      // Show live step-by-step progress box
+      singleUploadStatusBox.innerHTML = `
+        <div class="live-progress-steps">
+          <div class="progress-step-item active">
+            <span class="spinner" style="display:inline-block; width:16px; height:16px; border:2px solid var(--brand-orange); border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite;"></span>
+            <span>1. YouTube stream download ho rahi hai...</span>
+          </div>
+          <div class="progress-step-item">
+            <span>🛡️</span>
+            <span>2. Storage limit (&lt; 500MB) verify &amp; auto-compression check...</span>
+          </div>
+          <div class="progress-step-item">
+            <span>📤</span>
+            <span>3. Bideo channel me publish ho raha hai...</span>
+          </div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/upload_single_url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            video_url: videoUrl,
+            bideo_user_id: bideoUserId,
+            category_id: categoryId,
+            title: customTitle,
+            description: customDesc
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Upload fail ho gaya');
+        }
+
+        showSingleAlert(data.message, 'success');
+
+        // Render success card with video details
+        singleUploadStatusBox.innerHTML = `
+          <div class="single-result-card">
+            <h4>✅ Video Successfully Published!</h4>
+            <div class="result-meta-item">
+              <span class="lbl">Title:</span>
+              <span class="val">${data.title || 'Published Video'}</span>
+            </div>
+            <div class="result-meta-item">
+              <span class="lbl">Bideo Channel:</span>
+              <span class="val">${data.channel_name || 'Your Channel'}</span>
+            </div>
+            <div class="result-meta-item">
+              <span class="lbl">Downloaded Size:</span>
+              <span class="val" style="color:#34D399;">${data.file_size_mb} MB (&lt; 500MB Safe)</span>
+            </div>
+            <div class="result-meta-item">
+              <span class="lbl">Video ID:</span>
+              <span class="val" style="font-family:monospace;">${data.video ? (data.video._id || data.video.id) : 'Success'}</span>
+            </div>
+          </div>
+        `;
+
+        singleVideoUrl.value = '';
+        singleCustomTitle.value = '';
+        singleCustomDesc.value = '';
+
+        loadLogs();
+
+      } catch (err) {
+        showSingleAlert(err.message, 'error');
+        singleUploadStatusBox.innerHTML = `
+          <div class="status-placeholder" style="color:#EF4444;">
+            <div class="status-icon">❌</div>
+            <h4 style="color:#EF4444;">Upload Failed</h4>
+            <p>${err.message}</p>
+          </div>
+        `;
+      } finally {
+        btnText.textContent = '🚀 Download & Upload to Bideo Now';
+        spinner.classList.add('hidden');
+        singleLinkSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  function showSingleAlert(msg, type) {
+    if (!singleLinkAlert) return;
+    singleLinkAlert.textContent = msg;
+    singleLinkAlert.className = `alert-box ${type}`;
+    singleLinkAlert.classList.remove('hidden');
+  }
 
   // -----------------------------------------------------------
   // Live Activity Logs (Fetched from Firebase Realtime DB)

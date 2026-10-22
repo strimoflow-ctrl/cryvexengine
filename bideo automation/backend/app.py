@@ -288,6 +288,107 @@ def get_logs():
 
 
 # -------------------------------------------------------------
+# API: Single YouTube Video / Shorts Link Upload (Under 500MB)
+# -------------------------------------------------------------
+@app.route("/api/upload_single_url", methods=["POST"])
+def upload_single_url():
+    data = request.get_json() or {}
+    video_url = data.get("video_url", "").strip()
+    bideo_user_id = data.get("bideo_user_id", "").strip()
+    category_id = data.get("category_id", "").strip()
+    custom_title = data.get("title", "").strip()
+    custom_desc = data.get("description", "").strip()
+
+    if not video_url:
+        return jsonify({"success": False, "message": "YouTube Video URL zaroori hai!"}), 400
+    if not bideo_user_id:
+        return jsonify({"success": False, "message": "Target Bideo Account select karein!"}), 400
+
+    account = FirebaseClient.get_account_by_id(bideo_user_id)
+    if not account or not account.get("token"):
+        return jsonify({"success": False, "message": "Bideo account not found ya logged out hai!"}), 404
+
+    token = account["token"]
+    bideo_channel_name = account.get("name", "Bideo Channel")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            print(f"[Single Link Upload] Downloading {video_url} with <500MB safeguard...")
+            dl_result = YouTubeWorker.download_video_1080p(video_url, tmp_dir)
+
+            vid_id = dl_result["video_id"]
+            final_title = custom_title or dl_result["title"] or "YouTube Video"
+            description = custom_desc or dl_result["description"] or ""
+            video_path = dl_result["video_path"]
+            thumb_path = dl_result["thumb_path"]
+            is_short = dl_result["is_short"]
+            duration = dl_result["duration"]
+
+            meta = {
+                "duration": duration,
+                "width": dl_result["width"],
+                "height": dl_result["height"]
+            }
+
+            file_size_mb = round(os.path.getsize(video_path) / (1024 * 1024), 1)
+            print(f"[Single Link Upload] Publishing '{final_title}' ({file_size_mb} MB) to '{bideo_channel_name}'...")
+
+            success, bideo_data, err_msg = BideoClient.upload_video(
+                token=token,
+                video_path=video_path,
+                thumb_path=thumb_path,
+                title=final_title,
+                description=description,
+                category_id=category_id,
+                is_short=is_short,
+                meta=meta
+            )
+
+            if not success:
+                FirebaseClient.add_log(
+                    "Single Link Upload Failed",
+                    f"Failed to publish '{final_title}': {err_msg}",
+                    "error",
+                    {"video_url": video_url, "bideo_user_id": bideo_user_id}
+                )
+                return jsonify({"success": False, "message": err_msg or "Upload fail ho gaya"}), 500
+
+            # Record in Firebase to prevent future automated duplicates
+            bideo_vid_id = bideo_data.get("_id") or bideo_data.get("id", "unknown")
+            record = {
+                "yt_video_id": vid_id,
+                "title": final_title,
+                "bideo_video_id": bideo_vid_id,
+                "bideo_user_id": bideo_user_id,
+                "bideo_channel_name": bideo_channel_name,
+                "is_short": is_short,
+                "duration": duration,
+                "file_size_mb": file_size_mb,
+                "uploaded_via": "single_link_uploader"
+            }
+            FirebaseClient.mark_video_posted(vid_id, record)
+
+            log_msg = f"Single Link Video '{final_title}' ({file_size_mb} MB) successfully published to '{bideo_channel_name}'!"
+            print(f"✅ {log_msg}")
+            FirebaseClient.add_log("Single Video Published", log_msg, "success", record)
+
+            return jsonify({
+                "success": True,
+                "message": log_msg,
+                "video": bideo_data,
+                "file_size_mb": file_size_mb,
+                "title": final_title,
+                "channel_name": bideo_channel_name
+            })
+
+    except Exception as e:
+        err = f"Single link upload error: {str(e)}"
+        print(f"❌ {err}")
+        FirebaseClient.add_log("Single Link Upload Error", err, "error", {"video_url": video_url})
+        return jsonify({"success": False, "message": err}), 500
+
+
+# -------------------------------------------------------------
 # API: Direct Manual Video Upload from PC
 # -------------------------------------------------------------
 @app.route("/api/upload", methods=["POST"])
