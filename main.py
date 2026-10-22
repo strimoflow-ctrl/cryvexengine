@@ -28,8 +28,8 @@ os.chdir(BACKEND_DIR)
 from app import app
 
 if __name__ == "__main__":
-    # Botkeep or cloud port
-    port = int(os.environ.get("PORT", 5000))
+    # Botkeep uses SERVER_PORT; other cloud hosts use PORT
+    port = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or 5000)
     print("==================================================")
     print(">>> BIDEO 24/7 AUTOMATION ENGINE ACTIVE (BOTKEEP)")
     print(f">>> Listening on: 0.0.0.0:{port}")

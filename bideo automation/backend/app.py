@@ -364,7 +364,7 @@ except Exception as e:
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or 5000)
     print("==================================================")
     print(">>> BIDEO MULTI-CHANNEL & YOUTUBE AUTOMATION ACTIVE")
     print(f">>> Dashboard URL: http://localhost:{port}")
