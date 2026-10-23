@@ -156,79 +156,100 @@ document.addEventListener('DOMContentLoaded', () => {
   const cookiesStatusText = document.getElementById('cookiesStatusText');
   const saveCookiesBtn = document.getElementById('saveCookiesBtn');
 
+  // In-page cookies elements
+  const cardCookiesStatusText = document.getElementById('cardCookiesStatusText');
+  const cardCookiesAlert = document.getElementById('cardCookiesAlert');
+  const cardCookiesInput = document.getElementById('cardCookiesInput');
+  const cardSaveCookiesBtn = document.getElementById('cardSaveCookiesBtn');
+
   async function checkCookiesStatus() {
-    if (!cookiesStatusText) return;
     try {
       const res = await fetch('/api/cookies_status');
       const data = await res.json();
-      if (data.has_cookies) {
-        cookiesStatusText.innerHTML = `<span style="color:#34D399;">🟢 Active (${data.size_bytes} bytes saved)</span>`;
-      } else {
-        cookiesStatusText.innerHTML = `<span style="color:#EF4444;">🔴 Missing (Required for Botkeep Cloud IP)</span>`;
-      }
+      const statusHtml = data.has_cookies
+        ? `<span style="color:#34D399;">🟢 Active (${data.size_bytes}B)</span>`
+        : `<span style="color:#EF4444;">🔴 Missing</span>`;
+
+      if (cookiesStatusText) cookiesStatusText.innerHTML = statusHtml;
+      if (cardCookiesStatusText) cardCookiesStatusText.innerHTML = statusHtml;
     } catch (e) {
-      cookiesStatusText.textContent = 'Unknown';
+      if (cookiesStatusText) cookiesStatusText.textContent = 'Unknown';
+      if (cardCookiesStatusText) cardCookiesStatusText.textContent = 'Unknown';
     }
   }
 
+  // Check immediately on load
+  checkCookiesStatus();
+
   if (openCookiesModalBtn) {
-    openCookiesModalBtn.addEventListener('click', () => {
-      cookiesModal.classList.remove('hidden');
-      checkCookiesStatus();
+    openCookiesModalBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (cookiesModal) {
+        cookiesModal.classList.remove('hidden');
+        checkCookiesStatus();
+      }
     });
   }
 
   if (closeCookiesModalBtn) {
     closeCookiesModalBtn.addEventListener('click', () => {
-      cookiesModal.classList.add('hidden');
+      if (cookiesModal) cookiesModal.classList.add('hidden');
     });
   }
 
+  async function handleSaveCookies(text, alertEl, btnEl) {
+    if (!text) {
+      alertEl.textContent = 'Kripya cookies.txt ka text yahan paste karein.';
+      alertEl.className = 'alert-box alert-error';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    const btnText = btnEl.querySelector('.btn-text');
+    const spinner = btnEl.querySelector('.spinner');
+    btnText.textContent = 'Saving...';
+    if (spinner) spinner.classList.remove('hidden');
+    btnEl.disabled = true;
+
+    try {
+      const res = await fetch('/api/save_cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookies_text: text })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save');
+
+      alertEl.textContent = data.message;
+      alertEl.className = 'alert-box alert-success';
+      alertEl.classList.remove('hidden');
+      checkCookiesStatus();
+
+      if (cookiesModal && !cookiesModal.classList.contains('hidden')) {
+        setTimeout(() => { cookiesModal.classList.add('hidden'); }, 1800);
+      }
+    } catch (err) {
+      alertEl.textContent = err.message;
+      alertEl.className = 'alert-box alert-error';
+      alertEl.classList.remove('hidden');
+    } finally {
+      btnText.textContent = '💾 Save Cookies to Botkeep';
+      if (spinner) spinner.classList.add('hidden');
+      btnEl.disabled = false;
+    }
+  }
+
   if (cookiesForm) {
-    cookiesForm.addEventListener('submit', async (e) => {
+    cookiesForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      cookiesAlert.classList.add('hidden');
-      const text = cookiesTextInput.value.trim();
-      if (!text) {
-        cookiesAlert.textContent = 'Kripya cookies.txt ka text yahan paste karein.';
-        cookiesAlert.className = 'alert-box alert-error';
-        cookiesAlert.classList.remove('hidden');
-        return;
-      }
+      handleSaveCookies(cookiesTextInput.value.trim(), cookiesAlert, saveCookiesBtn);
+    });
+  }
 
-      const btnText = saveCookiesBtn.querySelector('.btn-text');
-      const spinner = saveCookiesBtn.querySelector('.spinner');
-      btnText.textContent = 'Saving...';
-      spinner.classList.remove('hidden');
-      saveCookiesBtn.disabled = true;
-
-      try {
-        const res = await fetch('/api/save_cookies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cookies_text: text })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save');
-
-        cookiesAlert.textContent = data.message;
-        cookiesAlert.className = 'alert-box alert-success';
-        cookiesAlert.classList.remove('hidden');
-        cookiesTextInput.value = '';
-        checkCookiesStatus();
-
-        setTimeout(() => {
-          cookiesModal.classList.add('hidden');
-        }, 2000);
-      } catch (err) {
-        cookiesAlert.textContent = err.message;
-        cookiesAlert.className = 'alert-box alert-error';
-        cookiesAlert.classList.remove('hidden');
-      } finally {
-        btnText.textContent = '💾 Save Cookies to Server';
-        spinner.classList.add('hidden');
-        saveCookiesBtn.disabled = false;
-      }
+  if (cardSaveCookiesBtn) {
+    cardSaveCookiesBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleSaveCookies(cardCookiesInput.value.trim(), cardCookiesAlert, cardSaveCookiesBtn);
     });
   }
 

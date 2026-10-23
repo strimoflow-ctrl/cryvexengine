@@ -138,10 +138,13 @@ class FirebaseClient:
             return False
 
     # -------------------------------------------------------------
-    # Automation Activity Logs
+    # Automation Activity Logs (STRICTLY LOCAL SERVER MEMORY - ZERO FIREBASE CHARGES)
     # -------------------------------------------------------------
+    _local_logs = []
+
     @classmethod
     def add_log(cls, title, message, status="success", meta=None):
+        """Stores logs in local server memory only to prevent any Firebase RTDB charges."""
         try:
             log_id = f"log_{int(datetime.utcnow().timestamp() * 1000)}"
             entry = {
@@ -152,19 +155,21 @@ class FirebaseClient:
                 "timestamp": datetime.utcnow().isoformat(),
                 "meta": meta or {}
             }
-            requests.put(cls._url(f"logs/{log_id}"), json=entry, timeout=5)
-        except Exception as e:
-            print(f"[Firebase Log Notice] {e}")
+            cls._local_logs.insert(0, entry)
+            if len(cls._local_logs) > 80:
+                cls._local_logs.pop()
+        except Exception:
+            pass
 
     @classmethod
     def get_logs(cls, limit=30):
+        """Returns logs from local server memory."""
+        return cls._local_logs[:limit]
+
+    @classmethod
+    def purge_firebase_logs(cls):
+        """Deletes any past logs from Firebase to completely free up database space."""
         try:
-            r = requests.get(cls._url("logs"), timeout=8)
-            data = r.json()
-            if isinstance(data, dict):
-                logs = list(data.values())
-                logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-                return logs[:limit]
-            return []
+            requests.delete(cls._url("logs"), timeout=5)
         except Exception:
-            return []
+            pass
