@@ -1,1 +1,1 @@
-web: cd "bideo automation/backend" && python app.py
+web: cd bots && python server.py

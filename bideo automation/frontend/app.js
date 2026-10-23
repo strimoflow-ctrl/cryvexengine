@@ -366,22 +366,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function populatePairingAccountSelect() {
-    pairingBideoSelect.innerHTML = '<option value="">-- Target Bideo Account Chunein --</option>';
+    if (pairingBideoSelect) pairingBideoSelect.innerHTML = '<option value="">-- Target Bideo Account Chunein --</option>';
     if (singleBideoSelect) singleBideoSelect.innerHTML = '<option value="">-- Target Bideo Account Chunein --</option>';
+    const batchSelect = document.getElementById('batchBideoAccountSelect');
+    if (batchSelect) batchSelect.innerHTML = '<option value="">Select Bideo Account...</option>';
 
     savedAccounts.forEach(acc => {
       const opt = document.createElement('option');
-      opt.value = acc._id;
+      opt.value = acc._id || acc.id;
       opt.textContent = `${acc.name || 'Channel'} (${acc.channelName ? '@' + acc.channelName : acc.phone})`;
-      if (currentActiveAccount && acc._id === currentActiveAccount._id) {
+      if (currentActiveAccount && (acc._id === currentActiveAccount._id || acc.id === currentActiveAccount.id)) {
         opt.selected = true;
       }
-      pairingBideoSelect.appendChild(opt);
-
-      if (singleBideoSelect) {
-        const optSingle = opt.cloneNode(true);
-        singleBideoSelect.appendChild(optSingle);
-      }
+      if (pairingBideoSelect) pairingBideoSelect.appendChild(opt);
+      if (singleBideoSelect) singleBideoSelect.appendChild(opt.cloneNode(true));
+      if (batchSelect) batchSelect.appendChild(opt.cloneNode(true));
     });
   }
 
@@ -459,26 +458,39 @@ document.addEventListener('DOMContentLoaded', () => {
         allCategories = data.categories;
 
         // Populate manual upload select
-        categorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
-        pairingCategorySelect.innerHTML = '<option value="">-- Default Category Chunein (Optional) --</option>';
+        if (categorySelect) categorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
+        if (pairingCategorySelect) pairingCategorySelect.innerHTML = '<option value="">-- Default Category Chunein (Optional) --</option>';
         if (singleCategorySelect) singleCategorySelect.innerHTML = '<option value="">-- Category Chunein (Optional) --</option>';
+        const batchCatSelect = document.getElementById('batchCategorySelect');
+        if (batchCatSelect) batchCatSelect.innerHTML = '<option value="">Select Category...</option>';
 
         data.categories.forEach(cat => {
-          const opt1 = document.createElement('option');
-          opt1.value = cat._id;
-          opt1.textContent = `${cat.name} (${cat.videosCount || 0} videos)`;
-          categorySelect.appendChild(opt1);
+          if (categorySelect) {
+            const opt1 = document.createElement('option');
+            opt1.value = cat._id || cat.id;
+            opt1.textContent = `${cat.name} (${cat.videosCount || 0} videos)`;
+            categorySelect.appendChild(opt1);
+          }
 
-          const opt2 = document.createElement('option');
-          opt2.value = cat._id;
-          opt2.textContent = cat.name;
-          pairingCategorySelect.appendChild(opt2);
+          if (pairingCategorySelect) {
+            const opt2 = document.createElement('option');
+            opt2.value = cat._id || cat.id;
+            opt2.textContent = cat.name;
+            pairingCategorySelect.appendChild(opt2);
+          }
 
           if (singleCategorySelect) {
             const opt3 = document.createElement('option');
-            opt3.value = cat._id;
+            opt3.value = cat._id || cat.id;
             opt3.textContent = cat.name;
             singleCategorySelect.appendChild(opt3);
+          }
+
+          if (batchCatSelect) {
+            const opt4 = document.createElement('option');
+            opt4.value = cat._id || cat.id;
+            opt4.textContent = cat.name;
+            batchCatSelect.appendChild(opt4);
           }
         });
       }
@@ -501,8 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeCount = data.pairings.filter(p => p.is_active).length;
         const totalPostedCount = data.pairings.reduce((sum, p) => sum + (p.total_posted || 0), 0);
 
-        statActivePairings.textContent = activeCount;
-        statTotalPosted.textContent = totalPostedCount;
+        if (statActivePairings) statActivePairings.textContent = activeCount;
+        if (statTotalPosted) statTotalPosted.textContent = totalPostedCount;
       }
     } catch (e) {
       if (!isSilent) console.warn('Could not load pairings:', e);
@@ -510,6 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderPairings(pairings) {
+    if (!pairingsContainer) return;
     if (!pairings || pairings.length === 0) {
       pairingsContainer.innerHTML = '<div class="empty-state">No YouTube channels linked yet. Add your first channel on the left!</div>';
       return;
@@ -599,85 +612,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Create Pairing Form Submit
-  pairingForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    pairingAlert.classList.add('hidden');
+  if (pairingForm && savePairingBtn) {
+    pairingForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (pairingAlert) pairingAlert.classList.add('hidden');
 
-    const ytInput = ytChannelInput.value.trim();
-    const bideoUserId = pairingBideoSelect.value;
-    const catId = pairingCategorySelect.value;
-    const catName = pairingCategorySelect.options[pairingCategorySelect.selectedIndex]?.text || '';
+      const ytInput = ytChannelInput ? ytChannelInput.value.trim() : '';
+      const bideoUserId = pairingBideoSelect ? pairingBideoSelect.value : '';
+      const catId = pairingCategorySelect ? pairingCategorySelect.value : '';
+      const catName = (pairingCategorySelect && pairingCategorySelect.options[pairingCategorySelect.selectedIndex]?.text) || '';
 
-    if (!ytInput || !bideoUserId) {
-      showPairingAlert('YouTube URL aur Target Bideo Account dono chunein!', 'error');
-      return;
-    }
-
-    const btnText = savePairingBtn.querySelector('.btn-text');
-    const spinner = savePairingBtn.querySelector('.spinner');
-
-    btnText.textContent = 'Connecting Channel...';
-    spinner.classList.remove('hidden');
-    savePairingBtn.disabled = true;
-
-    try {
-      const res = await fetch('/api/pairings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          yt_channel: ytInput,
-          bideo_user_id: bideoUserId,
-          category_id: catId,
-          category_name: catName
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Channel link nahi ho saka.');
+      if (!ytInput || !bideoUserId) {
+        showPairingAlert('YouTube URL aur Target Bideo Account dono chunein!', 'error');
+        return;
       }
 
-      showPairingAlert(`🎉 YouTube Channel '${data.pairing.yt_channel_name}' Bideo ke sath connect ho gaya! Pehla video download aur upload shuru ho chuka hai.`, 'success');
-      ytChannelInput.value = '';
-      loadPairings();
-      loadLogs();
+      const btnText = savePairingBtn.querySelector('.btn-text');
+      const spinner = savePairingBtn.querySelector('.spinner');
 
-      // Trigger immediate first video download & upload!
-      if (data.pairing && data.pairing.id) {
-        fetch(`/api/pairings/${data.pairing.id}/sync`, { method: 'POST' }).then(() => {
-          setTimeout(loadLogs, 3000);
-          setTimeout(loadPairings, 6000);
-        }).catch(() => {});
+      if (btnText) btnText.textContent = 'Connecting Channel...';
+      if (spinner) spinner.classList.remove('hidden');
+      savePairingBtn.disabled = true;
 
-        setTimeout(() => {
-          openChannelCatalog(data.pairing.yt_channel_url || data.pairing.yt_channel_name, data.pairing.id, data.pairing.bideo_user_id, data.pairing.category_id);
-        }, 500);
+      try {
+        const res = await fetch('/api/pairings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            yt_channel: ytInput,
+            bideo_user_id: bideoUserId,
+            category_id: catId,
+            category_name: catName
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Channel link nahi ho saka.');
+        }
+
+        showPairingAlert(`🎉 YouTube Channel '${data.pairing.yt_channel_name}' Bideo ke sath connect ho gaya! Pehla video download aur upload shuru ho chuka hai.`, 'success');
+        if (ytChannelInput) ytChannelInput.value = '';
+        loadPairings();
+        loadLogs();
+
+        // Trigger immediate first video download & upload!
+        if (data.pairing && data.pairing.id) {
+          fetch(`/api/pairings/${data.pairing.id}/sync`, { method: 'POST' }).then(() => {
+            setTimeout(loadLogs, 3000);
+            setTimeout(loadPairings, 6000);
+          }).catch(() => {});
+
+          setTimeout(() => {
+            openChannelCatalog(data.pairing.yt_channel_url || data.pairing.yt_channel_name, data.pairing.id, data.pairing.bideo_user_id, data.pairing.category_id);
+          }, 500);
+        }
+
+      } catch (err) {
+        showPairingAlert(err.message, 'error');
+      } finally {
+        if (btnText) btnText.textContent = '➕ Connect & Activate Automation';
+        if (spinner) spinner.classList.add('hidden');
+        savePairingBtn.disabled = false;
       }
-
-    } catch (err) {
-      showPairingAlert(err.message, 'error');
-    } finally {
-      btnText.textContent = '➕ Connect & Activate Automation';
-      spinner.classList.add('hidden');
-      savePairingBtn.disabled = false;
-    }
-  });
-
-  function showPairingAlert(msg, type) {
-    pairingAlert.textContent = msg;
-    pairingAlert.className = `alert-box ${type}`;
-    pairingAlert.classList.remove('hidden');
+    });
   }
 
-  refreshPairingsBtn.addEventListener('click', () => loadPairings());
+  function showPairingAlert(msg, type) {
+    if (pairingAlert) {
+      pairingAlert.textContent = msg;
+      pairingAlert.className = `alert-box ${type}`;
+      pairingAlert.classList.remove('hidden');
+    }
+  }
+
+  if (refreshPairingsBtn) {
+    refreshPairingsBtn.addEventListener('click', () => loadPairings());
+  }
 
   // Master Sync All Trigger
-  syncAllBtn.addEventListener('click', async () => {
-    const btnText = syncAllBtn.querySelector('.btn-text');
-    const spinner = syncAllBtn.querySelector('.spinner');
+  if (syncAllBtn) {
+    syncAllBtn.addEventListener('click', async () => {
+      const btnText = syncAllBtn.querySelector('.btn-text');
+      const spinner = syncAllBtn.querySelector('.spinner');
 
-    btnText.textContent = 'Running All...';
-    spinner.classList.remove('hidden');
+      if (btnText) btnText.textContent = 'Running All...';
+      if (spinner) spinner.classList.remove('hidden');
     syncAllBtn.disabled = true;
 
     try {
@@ -695,7 +715,8 @@ document.addEventListener('DOMContentLoaded', () => {
       spinner.classList.add('hidden');
       syncAllBtn.disabled = false;
     }
-  });
+    });
+  }
 
   // -----------------------------------------------------------
   // Instant Single YouTube Video / Shorts Link Uploader
@@ -1281,6 +1302,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-refresh Kaggle status every 10 seconds
     setInterval(loadKaggleStatus, 10000);
     loadKaggleStatus();
+  }
+
   // -----------------------------------------------------------
   // YOUTUBE CHANNEL VIDEO CATALOG EXPLORER
   // -----------------------------------------------------------
@@ -1457,42 +1480,576 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Filter Tabs Event Listeners
-  const filterBtns = document.querySelectorAll('.filter-tab-btn');
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentActiveFilter = btn.dataset.filter;
-      renderCatalogVideos();
-    });
-  });
+  // -----------------------------------------------------------
+  // YOUTUBE CHANNEL STUDIO & ON-DEMAND BATCH ENGINE
+  // -----------------------------------------------------------
+  let studioCurrentChannel = null;
+  let studioCurrentVideos = [];
+  let studioActiveFilter = 'available'; // 'available', 'uploaded', 'all'
+  let studioSelectedIds = new Set();
+  let batchPollInterval = null;
 
-  // Search Filter
-  if (catalogSearchInput) {
-    catalogSearchInput.addEventListener('input', (e) => {
-      currentSearchQuery = e.target.value.trim();
-      renderCatalogVideos();
-    });
-  }
+  function setupChannelBatchStudio() {
+    const channelFetchInput = document.getElementById('channelFetchInput');
+    const fetchChannelBtn = document.getElementById('fetchChannelBtn');
+    const savedChannelsSelect = document.getElementById('savedChannelsSelect');
+    const channelFetchAlert = document.getElementById('channelFetchAlert');
 
-  // Close Catalog Modal
-  if (closeCatalogModalBtn) {
-    closeCatalogModalBtn.addEventListener('click', () => {
-      channelVideosModal.classList.add('hidden');
-    });
-  }
+    const currentChannelTitle = document.getElementById('currentChannelTitle');
+    const currentChannelLink = document.getElementById('currentChannelLink');
+    const statTotalVids = document.getElementById('statTotalVids');
+    const statUploadedVids = document.getElementById('statUploadedVids');
+    const statAvailableVids = document.getElementById('statAvailableVids');
 
-  // Preview Channel Videos Button in Connect Form
-  if (previewChannelBtn) {
-    previewChannelBtn.addEventListener('click', () => {
-      const input = ytChannelInput.value.trim();
+    const filterAvailableBtn = document.getElementById('filterAvailableBtn');
+    const filterUploadedBtn = document.getElementById('filterUploadedBtn');
+    const filterAllBtn = document.getElementById('filterAllBtn');
+
+    const selectNext4Btn = document.getElementById('selectNext4Btn');
+    const selectNext6Btn = document.getElementById('selectNext6Btn');
+    const selectNext10Btn = document.getElementById('selectNext10Btn');
+    const selectAllAvailableBtn = document.getElementById('selectAllAvailableBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+    const selectedCountBadge = document.getElementById('selectedCountBadge');
+
+    const channelVideosGrid = document.getElementById('channelVideosGrid');
+
+    const batchBideoAccountSelect = document.getElementById('batchBideoAccountSelect');
+    const batchCategorySelect = document.getElementById('batchCategorySelect');
+    const batchPacingSelect = document.getElementById('batchPacingSelect');
+    const startBatchUploadBtn = document.getElementById('startBatchUploadBtn');
+    const cancelActiveBatchBtn = document.getElementById('cancelActiveBatchBtn');
+
+    // Populate Bideo accounts in Batch Select
+    function populateBatchDropdowns() {
+      if (batchBideoAccountSelect) {
+        batchBideoAccountSelect.innerHTML = '<option value="">Select Bideo Account...</option>';
+        savedAccounts.forEach(acc => {
+          const opt = document.createElement('option');
+          opt.value = acc._id || acc.id;
+          opt.textContent = `${acc.name || acc.channelName} (${acc.phone || 'Connected'})`;
+          batchBideoAccountSelect.appendChild(opt);
+        });
+        if (currentActiveAccount && savedAccounts.length > 0) {
+          batchBideoAccountSelect.value = currentActiveAccount._id || currentActiveAccount.id;
+        }
+      }
+
+      if (batchCategorySelect) {
+        batchCategorySelect.innerHTML = '<option value="">Select Category...</option>';
+        allCategories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat._id || cat.id;
+          opt.textContent = cat.name || cat.title;
+          batchCategorySelect.appendChild(opt);
+        });
+      }
+    }
+
+    // Load saved channels list from Firebase
+    async function loadSavedChannelsList() {
+      if (!savedChannelsSelect) return;
+      try {
+        const res = await fetch('/api/channels');
+        const d = await res.json();
+        if (d.success && Array.isArray(d.channels)) {
+          savedChannelsSelect.innerHTML = '<option value="">Select a previously saved channel...</option>';
+          d.channels.forEach(ch => {
+            const opt = document.createElement('option');
+            opt.value = ch.id;
+            opt.textContent = `${ch.channel_name} (Total: ${ch.total_videos} | Uploaded: ${ch.uploaded_count})`;
+            savedChannelsSelect.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load saved channels:', err);
+      }
+    }
+
+    // Fetch videos from YouTube channel
+    async function handleFetchChannel() {
+      const input = channelFetchInput ? channelFetchInput.value.trim() : '';
       if (!input) {
-        showPairingAlert('Kripya pehle YouTube Channel URL ya @Handle likhein!', 'error');
+        if (channelFetchAlert) {
+          channelFetchAlert.textContent = 'Kripya YouTube channel URL ya @handle enter karein!';
+          channelFetchAlert.className = 'alert-box error';
+          channelFetchAlert.classList.remove('hidden');
+        }
         return;
       }
-      openChannelCatalog(input);
-    });
+
+      if (channelFetchAlert) channelFetchAlert.classList.add('hidden');
+      const btnText = fetchChannelBtn.querySelector('.btn-text');
+      const spinner = fetchChannelBtn.querySelector('.spinner');
+      if (btnText) btnText.textContent = 'Fetching...';
+      if (spinner) spinner.classList.remove('hidden');
+      fetchChannelBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/channels/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_input: input, max_results: 60 })
+        });
+        const data = await res.json();
+
+        if (data.success && data.channel) {
+          studioCurrentChannel = data.channel;
+          studioCurrentVideos = data.videos || [];
+          studioSelectedIds.clear();
+          renderVideoGallery();
+          loadSavedChannelsList();
+          if (channelFetchAlert) {
+            channelFetchAlert.textContent = `✅ '${data.channel.channel_name}' se ${studioCurrentVideos.length} videos load ho gaye!`;
+            channelFetchAlert.className = 'alert-box success';
+            channelFetchAlert.classList.remove('hidden');
+          }
+        } else {
+          if (channelFetchAlert) {
+            channelFetchAlert.textContent = data.message || 'Channel fetch failed';
+            channelFetchAlert.className = 'alert-box error';
+            channelFetchAlert.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (channelFetchAlert) {
+          channelFetchAlert.textContent = `Network error: ${err.message}`;
+          channelFetchAlert.className = 'alert-box error';
+          channelFetchAlert.classList.remove('hidden');
+        }
+      } finally {
+        if (btnText) btnText.textContent = '🔍 Fetch Videos';
+        if (spinner) spinner.classList.add('hidden');
+        fetchChannelBtn.disabled = false;
+      }
+    }
+
+    // Load existing channel from dropdown
+    if (savedChannelsSelect) {
+      savedChannelsSelect.addEventListener('change', async (e) => {
+        const chId = e.target.value;
+        if (!chId) return;
+        channelVideosGrid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center;">Loading channel library...</div>';
+        try {
+          const res = await fetch(`/api/channels/${chId}/videos`);
+          const data = await res.json();
+          if (data.success) {
+            studioCurrentVideos = data.videos || [];
+            const selOpt = savedChannelsSelect.options[savedChannelsSelect.selectedIndex];
+            studioCurrentChannel = {
+              id: chId,
+              channel_name: selOpt ? selOpt.textContent.split('(')[0].trim() : 'YouTube Channel'
+            };
+            studioSelectedIds.clear();
+            renderVideoGallery();
+          }
+        } catch (err) {
+          alert(`Error loading channel videos: ${err.message}`);
+        }
+      });
+    }
+
+    // Render Video Cards in Gallery
+    function renderVideoGallery() {
+      if (!channelVideosGrid) return;
+
+      const total = studioCurrentVideos.length;
+      const uploaded = studioCurrentVideos.filter(v => v.uploaded).length;
+      const available = total - uploaded;
+
+      if (statTotalVids) statTotalVids.textContent = total;
+      if (statUploadedVids) statUploadedVids.textContent = uploaded;
+      if (statAvailableVids) statAvailableVids.textContent = available;
+
+      if (studioCurrentChannel && currentChannelTitle) {
+        currentChannelTitle.textContent = studioCurrentChannel.channel_name || 'YouTube Channel';
+        if (studioCurrentChannel.channel_url && currentChannelLink) {
+          currentChannelLink.href = studioCurrentChannel.channel_url;
+          currentChannelLink.classList.remove('hidden');
+        }
+      }
+
+      let filtered = studioCurrentVideos;
+      if (studioActiveFilter === 'available') {
+        filtered = studioCurrentVideos.filter(v => !v.uploaded);
+      } else if (studioActiveFilter === 'uploaded') {
+        filtered = studioCurrentVideos.filter(v => v.uploaded);
+      }
+
+      channelVideosGrid.innerHTML = '';
+      if (filtered.length === 0) {
+        channelVideosGrid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center; color: #94a3b8;">
+          No videos found for filter '<strong>${studioActiveFilter}</strong>'.
+        </div>`;
+        updateSelectionCounter();
+        return;
+      }
+
+      filtered.forEach(v => {
+        const card = document.createElement('div');
+        const isSelected = studioSelectedIds.has(v.id);
+        const isUploaded = Boolean(v.uploaded);
+
+        card.className = `gallery-video-card ${isSelected ? 'selected' : ''} ${isUploaded ? 'uploaded' : ''}`;
+
+        const durMin = Math.floor((v.duration || 0) / 60);
+        const durSec = (v.duration || 0) % 60;
+        const durStr = `${durMin}:${durSec < 10 ? '0' : ''}${durSec}`;
+
+        card.innerHTML = `
+          <div class="gallery-card-thumb-wrap">
+            <img src="${v.thumbnail || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`}" alt="${v.title}" class="gallery-card-thumb" loading="lazy">
+            <span class="video-duration-pill">${durStr}</span>
+            <span class="video-type-badge ${v.is_short ? 'shorts' : 'long'}">${v.is_short ? '⚡ SHORT' : '▶ VIDEO'}</span>
+            ${!isUploaded ? `
+              <div class="video-check-overlay">
+                <input type="checkbox" class="video-select-checkbox" data-id="${v.id}" ${isSelected ? 'checked' : ''}>
+              </div>
+            ` : ''}
+          </div>
+          <div class="channel-video-body">
+            <div class="channel-video-title" title="${v.title}">${v.title}</div>
+            <div class="channel-video-footer">
+              ${isUploaded ? `
+                <span class="video-status-tag uploaded">🟢 Uploaded to Bideo</span>
+              ` : `
+                <span class="video-status-tag pending">⚪ Available</span>
+              `}
+              <a href="${v.url || `https://www.youtube.com/watch?v=${v.id}`}" target="_blank" style="font-size: 0.75rem; color: #38bdf8;" onclick="event.stopPropagation();">
+                Watch ↗
+              </a>
+            </div>
+          </div>
+        `;
+
+        if (!isUploaded) {
+          card.addEventListener('click', (e) => {
+            if (e.target.tagName === 'A') return;
+            if (studioSelectedIds.has(v.id)) {
+              studioSelectedIds.delete(v.id);
+            } else {
+              studioSelectedIds.add(v.id);
+            }
+            renderVideoGallery();
+          });
+        }
+
+        channelVideosGrid.appendChild(card);
+      });
+
+      updateSelectionCounter();
+    }
+
+    function updateSelectionCounter() {
+      if (selectedCountBadge) {
+        selectedCountBadge.textContent = `🎯 ${studioSelectedIds.size} Videos Selected`;
+      }
+    }
+
+    // Quick selection logic
+    function selectNextN(n) {
+      const unuploaded = studioCurrentVideos.filter(v => !v.uploaded);
+      let count = 0;
+      for (const v of unuploaded) {
+        if (!studioSelectedIds.has(v.id)) {
+          studioSelectedIds.add(v.id);
+          count++;
+          if (count >= n) break;
+        }
+      }
+      renderVideoGallery();
+    }
+
+    if (selectNext4Btn) selectNext4Btn.addEventListener('click', () => selectNextN(4));
+    if (selectNext6Btn) selectNext6Btn.addEventListener('click', () => selectNextN(6));
+    if (selectNext10Btn) selectNext10Btn.addEventListener('click', () => selectNextN(10));
+    if (selectAllAvailableBtn) {
+      selectAllAvailableBtn.addEventListener('click', () => {
+        studioCurrentVideos.filter(v => !v.uploaded).forEach(v => studioSelectedIds.add(v.id));
+        renderVideoGallery();
+      });
+    }
+    if (clearSelectionBtn) {
+      clearSelectionBtn.addEventListener('click', () => {
+        studioSelectedIds.clear();
+        renderVideoGallery();
+      });
+    }
+
+    // Filter Buttons
+    if (filterAvailableBtn) {
+      filterAvailableBtn.addEventListener('click', () => {
+        studioActiveFilter = 'available';
+        filterAvailableBtn.classList.add('active');
+        if (filterUploadedBtn) filterUploadedBtn.classList.remove('active');
+        if (filterAllBtn) filterAllBtn.classList.remove('active');
+        renderVideoGallery();
+      });
+    }
+    if (filterUploadedBtn) {
+      filterUploadedBtn.addEventListener('click', () => {
+        studioActiveFilter = 'uploaded';
+        filterUploadedBtn.classList.add('active');
+        if (filterAvailableBtn) filterAvailableBtn.classList.remove('active');
+        if (filterAllBtn) filterAllBtn.classList.remove('active');
+        renderVideoGallery();
+      });
+    }
+    if (filterAllBtn) {
+      filterAllBtn.addEventListener('click', () => {
+        studioActiveFilter = 'all';
+        filterAllBtn.classList.add('active');
+        if (filterAvailableBtn) filterAvailableBtn.classList.remove('active');
+        if (filterUploadedBtn) filterUploadedBtn.classList.remove('active');
+        renderVideoGallery();
+      });
+    }
+
+    if (fetchChannelBtn) fetchChannelBtn.addEventListener('click', handleFetchChannel);
+    if (channelFetchInput) {
+      channelFetchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleFetchChannel();
+      });
+    }
+
+    // START BATCH UPLOAD TO KAGGLE
+    if (startBatchUploadBtn) {
+      startBatchUploadBtn.addEventListener('click', async () => {
+        if (studioSelectedIds.size === 0) {
+          alert('Kripya pehle kam se kam 1 video select karein!');
+          return;
+        }
+
+        const bideoUserId = batchBideoAccountSelect ? batchBideoAccountSelect.value : '';
+        if (!bideoUserId) {
+          alert('Kripya Target Bideo Channel select karein!');
+          return;
+        }
+
+        const categoryId = batchCategorySelect ? batchCategorySelect.value : '';
+        const pacingHours = batchPacingSelect ? parseFloat(batchPacingSelect.value || '9') : 9.0;
+
+        const selectedList = studioCurrentVideos.filter(v => studioSelectedIds.has(v.id));
+
+        const confirmMsg = `${selectedList.length} videos ko Kaggle pe push karna chahte hain?\nKaggle in sabko download karke ~${pacingHours} ghante me spaced-out post karega.`;
+        if (!confirm(confirmMsg)) return;
+
+        const btnText = startBatchUploadBtn.querySelector('.btn-text');
+        const spinner = startBatchUploadBtn.querySelector('.spinner');
+        if (btnText) btnText.textContent = 'Launching Kaggle Bot...';
+        if (spinner) spinner.classList.remove('hidden');
+        startBatchUploadBtn.disabled = true;
+
+        try {
+          const res = await fetch('/api/batch/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              selected_videos: selectedList,
+              bideo_user_id: bideoUserId,
+              category_id: categoryId,
+              pacing_hours: pacingHours
+            })
+          });
+          const d = await res.json();
+
+          if (d.success) {
+            alert(`🎉 ${d.message}`);
+            studioSelectedIds.clear();
+            renderVideoGallery();
+            pollBatchAndKaggleStatus();
+          } else {
+            alert(`❌ Error: ${d.message}`);
+          }
+        } catch (err) {
+          alert(`Network error: ${err.message}`);
+        } finally {
+          if (btnText) btnText.textContent = '🚀 Push Selected Videos to Kaggle';
+          if (spinner) spinner.classList.add('hidden');
+          startBatchUploadBtn.disabled = false;
+        }
+      });
+    }
+
+    // CANCEL ACTIVE BATCH
+    if (cancelActiveBatchBtn) {
+      cancelActiveBatchBtn.addEventListener('click', async () => {
+        if (!confirm('Kya aap running batch aur Kaggle engine ko stop karna chahte hain?')) return;
+        try {
+          const res = await fetch('/api/batch/cancel', { method: 'POST' });
+          const d = await res.json();
+          alert(d.message || 'Batch cancelled');
+          pollBatchAndKaggleStatus();
+        } catch (err) {
+          alert(`Error cancelling: ${err.message}`);
+        }
+      });
+    }
+
+    // Initial setup
+    populateBatchDropdowns();
+    loadSavedChannelsList();
+    pollBatchAndKaggleStatus();
+    if (!batchPollInterval) {
+      batchPollInterval = setInterval(pollBatchAndKaggleStatus, 12000);
+    }
+  }
+
+  // -----------------------------------------------------------
+  // KAGGLE BATCH STATUS & TELEMETRY POLLING
+  // -----------------------------------------------------------
+  async function pollBatchAndKaggleStatus() {
+    const kaggleStatusBadge = document.getElementById('kaggleStatusBadge');
+    const kaggleActiveStrip = document.getElementById('kaggleActiveStrip');
+    const batchProgressFraction = document.getElementById('batchProgressFraction');
+    const batchProgressBarFill = document.getElementById('batchProgressBarFill');
+    const batchPacingTimerText = document.getElementById('batchPacingTimerText');
+    const kaggleLiveTaskText = document.getElementById('kaggleLiveTaskText');
+    const kaggleUptimeText = document.getElementById('kaggleUptimeText');
+    const kaggleUploadCountText = document.getElementById('kaggleUploadCountText');
+    const cancelActiveBatchBtn = document.getElementById('cancelActiveBatchBtn');
+
+    try {
+      const res = await fetch('/api/batch/status');
+      const data = await res.json();
+      if (!data.success) return;
+
+      const batch = data.batch || {};
+      const status = data.kaggle_status || {};
+
+      const isRunning = Boolean(status.is_running);
+      const isBatchRunning = batch && batch.status === 'running';
+
+      if (isRunning || isBatchRunning) {
+        if (kaggleStatusBadge) {
+          kaggleStatusBadge.textContent = '⚡ Running Batch';
+          kaggleStatusBadge.style.background = 'rgba(74, 222, 128, 0.2)';
+          kaggleStatusBadge.style.color = '#4ade80';
+          kaggleStatusBadge.style.borderColor = '#4ade80';
+        }
+        if (kaggleActiveStrip) kaggleActiveStrip.classList.remove('hidden');
+        if (cancelActiveBatchBtn) cancelActiveBatchBtn.classList.remove('hidden');
+
+        const total = batch.total_count || 0;
+        const done = batch.completed_count || 0;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        if (batchProgressFraction) batchProgressFraction.textContent = `${done} / ${total} Videos`;
+        if (batchProgressBarFill) batchProgressBarFill.style.width = `${pct}%`;
+
+        if (kaggleLiveTaskText) kaggleLiveTaskText.textContent = status.current_task || 'Processing batch...';
+        if (kaggleUptimeText) kaggleUptimeText.textContent = status.uptime_str || '0h 0m';
+        if (kaggleUploadCountText) kaggleUploadCountText.textContent = status.total_uploaded_count || done;
+
+        if (status.current_task && status.current_task.includes('Next video in')) {
+          if (batchPacingTimerText) batchPacingTimerText.textContent = status.current_task;
+        } else {
+          if (batchPacingTimerText) batchPacingTimerText.textContent = `⚡ Uploading Video ${done + 1} of ${total}...`;
+        }
+      } else {
+        if (kaggleStatusBadge) {
+          if (status.state === 'completed' || batch.status === 'completed') {
+            kaggleStatusBadge.textContent = '🟢 Batch Completed';
+            kaggleStatusBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+            kaggleStatusBadge.style.color = '#38bdf8';
+            kaggleStatusBadge.style.borderColor = '#38bdf8';
+          } else {
+            kaggleStatusBadge.textContent = '⚪ Ready';
+            kaggleStatusBadge.style.background = 'rgba(100, 116, 139, 0.25)';
+            kaggleStatusBadge.style.color = '#94a3b8';
+            kaggleStatusBadge.style.borderColor = '#475569';
+          }
+        }
+        if (cancelActiveBatchBtn) cancelActiveBatchBtn.classList.add('hidden');
+      }
+    } catch (err) {
+      console.warn('Batch status poll error:', err);
+    }
+  }
+
+  // -----------------------------------------------------------
+  // KAGGLE MODAL & CONFIG LISTENERS
+  // -----------------------------------------------------------
+  function setupKaggleListeners() {
+    const openBtn = document.getElementById('openKaggleModalBtn');
+    const modal = document.getElementById('kaggleConfigModal');
+    const closeBtn = document.getElementById('closeKaggleModalBtn');
+    const cancelBtn = document.getElementById('cancelKaggleBtn');
+    const saveBtn = document.getElementById('saveKaggleBtn');
+
+    const userInput = document.getElementById('kaggleUserInput');
+    const keyInput = document.getElementById('kaggleKeyInput');
+    const slugInput = document.getElementById('kaggleSlugInput');
+    const alertBox = document.getElementById('kaggleAlert');
+
+    if (openBtn && modal) {
+      openBtn.addEventListener('click', async () => {
+        modal.classList.remove('hidden');
+        if (alertBox) alertBox.classList.add('hidden');
+        try {
+          const res = await fetch('/api/kaggle/config');
+          const d = await res.json();
+          if (d.success && d.config) {
+            if (userInput) userInput.value = d.config.kaggle_user || '';
+            if (keyInput) keyInput.value = d.config.kaggle_key || '';
+            if (slugInput) slugInput.value = d.config.kaggle_slug || 'bideo-automation-engine';
+          }
+        } catch (e) {
+          console.warn('Could not load Kaggle config:', e);
+        }
+      });
+    }
+
+    function closeModal() {
+      if (modal) modal.classList.add('hidden');
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const user = userInput ? userInput.value.trim() : '';
+        const key = keyInput ? keyInput.value.trim() : '';
+        const slug = slugInput ? slugInput.value.trim() : 'bideo-automation-engine';
+
+        if (!user || !key) {
+          if (alertBox) {
+            alertBox.textContent = 'Kaggle Username aur API Key dono zaroori hain!';
+            alertBox.className = 'alert-box error';
+            alertBox.classList.remove('hidden');
+          }
+          return;
+        }
+
+        saveBtn.disabled = true;
+        try {
+          const res = await fetch('/api/kaggle/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kaggle_user: user, kaggle_key: key, kaggle_slug: slug })
+          });
+          const d = await res.json();
+          if (d.success) {
+            alert('Kaggle Configuration Saved!');
+            closeModal();
+          } else {
+            if (alertBox) {
+              alertBox.textContent = d.message || 'Failed to save';
+              alertBox.className = 'alert-box error';
+              alertBox.classList.remove('hidden');
+            }
+          }
+        } catch (err) {
+          if (alertBox) {
+            alertBox.textContent = `Network error: ${err.message}`;
+            alertBox.className = 'alert-box error';
+            alertBox.classList.remove('hidden');
+          }
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
   }
 
   // -----------------------------------------------------------
@@ -1500,4 +2057,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // -----------------------------------------------------------
   initApp();
   setupKaggleListeners();
+  setupChannelBatchStudio();
 });
+

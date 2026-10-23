@@ -90,7 +90,9 @@ def check_worker_lease():
             if active_id and active_id != MY_SESSION_ID:
                 print(f"\n🛑 [Kaggle Engine] Session superseded by newer session '{active_id}'.")
                 print(f"🛑 Terminating old session ({MY_SESSION_ID}) immediately to prevent duplicate uploads!")
-                sys.exit(0)
+                import os
+                os.system("pkill -9 -f jupyter")
+                os._exit(0)
     except Exception as e:
         print(f"[Lease Check Notice] {e}")
 
@@ -617,7 +619,220 @@ def process_channel_pairings():
 
 
 # -------------------------------------------------------------
-# MAIN 11.5-HOUR AUTONOMOUS LOOP
+# WORKER: PROCESS ACTIVE BATCH (ON-DEMAND SELECTED VIDEOS)
+# -------------------------------------------------------------
+def process_active_batch():
+    """
+    Processes the on-demand batch of videos selected by user in the dashboard.
+    1. Downloads all selected videos to /kaggle/working/downloads/ first.
+    2. Spreads out uploads cleanly across target pacing duration (e.g. 9-10 hours).
+    3. Updates Firebase video catalog with uploaded=True so UI shows green badge.
+    4. Upon finishing all videos, marks batch complete and cleanly shuts down container.
+    """
+    check_worker_lease()
+    batch = fb_get("active_batch")
+    if not batch or not isinstance(batch, dict):
+        return False
+    
+    status = batch.get("status")
+    if status in ["completed", "cancelled"]:
+        return False
+        
+    videos = batch.get("videos") or []
+    if not videos:
+        return False
+        
+    bideo_user_id = batch.get("bideo_user_id")
+    category_id = batch.get("category_id")
+    pacing_hours = float(batch.get("pacing_hours") or 9.0)
+    batch_id = batch.get("batch_id")
+    
+    account = fb_get(f"accounts/{bideo_user_id}")
+    if not account or not account.get("token"):
+        print(f"❌ Target Bideo account '{bideo_user_id}' not found or has no token!")
+        return False
+    token = account["token"]
+    
+    # Filter out already posted videos
+    posted_videos = fb_get("posted_videos") or {}
+    to_process = [v for v in videos if v.get("id") and v.get("id") not in posted_videos]
+    
+    if not to_process:
+        print("🎉 All videos in this batch have already been posted!")
+        fb_patch("active_batch", {"status": "completed", "completed_at": datetime.now().isoformat()})
+        return True
+
+    print("\n" + "=" * 65)
+    print(f"🚀 [Kaggle Batch Execution] Starting batch: {batch_id}")
+    print(f"🎯 Total Videos to Post: {len(to_process)}")
+    print(f"⏱️ Target Schedule Spread: ~{pacing_hours} Hours")
+    print("=" * 65)
+    
+    fb_patch("active_batch", {"status": "running", "started_at": datetime.now().isoformat()})
+    
+    downloads_dir = "/kaggle/working/downloads"
+    os.makedirs(downloads_dir, exist_ok=True)
+    
+    # PHASE 1: Pre-download all videos to local Kaggle disk
+    downloaded_data = []
+    for idx, v in enumerate(to_process):
+        check_worker_lease()
+        curr_batch = fb_get("active_batch")
+        if curr_batch and curr_batch.get("status") == "cancelled":
+            print("🛑 Batch cancelled by user!")
+            return True
+            
+        vid_id = v.get("id")
+        vid_url = v.get("url") or f"https://www.youtube.com/watch?v={vid_id}"
+        vid_title = v.get("title", f"Video {vid_id}")
+        ch_id = v.get("channel_id")
+        
+        update_heartbeat(f"📥 Pre-downloading {idx + 1}/{len(to_process)}: '{vid_title}'", is_busy=True)
+        print(f"\n📥 Pre-downloading [{idx + 1}/{len(to_process)}] '{vid_title}' ({vid_id})...")
+        
+        try:
+            dl = download_youtube_video(vid_url, downloads_dir)
+            dl["channel_id"] = ch_id
+            dl["vid_id"] = vid_id
+            downloaded_data.append(dl)
+            print(f"✅ Downloaded: '{dl['title']}' ({dl['duration']}s)")
+        except Exception as dl_err:
+            print(f"❌ Failed to download '{vid_title}': {dl_err}")
+            
+    if not downloaded_data:
+        print("❌ Could not download any videos in batch.")
+        fb_patch("active_batch", {"status": "failed", "error": "All downloads failed"})
+        return True
+        
+    # PHASE 2: Spaced-out Uploading across pacing duration
+    total_downloaded = len(downloaded_data)
+    total_seconds = max(600, int(pacing_hours * 3600))
+    base_interval = int(total_seconds / total_downloaded) if total_downloaded > 1 else 0
+    
+    global total_uploaded_count
+    
+    for idx, item in enumerate(downloaded_data):
+        check_worker_lease()
+        curr_batch = fb_get("active_batch")
+        if curr_batch and curr_batch.get("status") == "cancelled":
+            print("🛑 Batch cancelled by user!")
+            break
+            
+        vid_id = item["vid_id"]
+        ch_id = item.get("channel_id")
+        title = item["title"]
+        desc = item["description"]
+        
+        update_heartbeat(f"📤 Uploading [{idx + 1}/{total_downloaded}]: '{title}'", is_busy=True)
+        print(f"\n📤 [Batch Uploading {idx + 1}/{total_downloaded}] '{title}' to Bideo...")
+        
+        try:
+            success, b_res, err = upload_to_bideo(
+                token=token,
+                video_path=item["video_path"],
+                thumb_path=item["thumb_path"],
+                title=title,
+                description=desc,
+                category_id=category_id,
+                is_short=item["is_short"],
+                meta={"duration": item["duration"], "width": item["width"], "height": item["height"]}
+            )
+            
+            if success:
+                total_uploaded_count += 1
+                b_vid_id = b_res.get("_id") or b_res.get("id") or "uploaded"
+                now_iso = datetime.now().isoformat()
+                
+                # Mark posted in posted_videos
+                fb_put(f"posted_videos/{vid_id}", {
+                    "yt_id": vid_id,
+                    "title": title,
+                    "bideo_user_id": bideo_user_id,
+                    "bideo_video_id": b_vid_id,
+                    "batch_id": batch_id,
+                    "posted_at": now_iso
+                })
+                
+                # Update channel library in Firebase so UI turns green!
+                if ch_id:
+                    fb_patch(f"channels/{ch_id}/videos/{vid_id}", {
+                        "uploaded": True,
+                        "bideo_video_id": b_vid_id,
+                        "uploaded_at": now_iso
+                    })
+                    
+                fb_patch("active_batch", {
+                    "completed_count": idx + 1,
+                    "last_uploaded_video": title,
+                    "last_uploaded_at": now_iso
+                })
+                
+                print(f"🎉 [Success {idx + 1}/{total_downloaded}] '{title}' uploaded to Bideo!")
+            else:
+                print(f"❌ [Upload Failed] '{title}': {err}")
+                
+        except Exception as up_err:
+            print(f"❌ [Upload Exception] '{title}': {up_err}")
+            
+        # Clean up local file to free disk space
+        try:
+            if os.path.exists(item["video_path"]):
+                os.remove(item["video_path"])
+            if os.path.exists(item["thumb_path"]):
+                os.remove(item["thumb_path"])
+        except Exception:
+            pass
+            
+        # If more videos remain, sleep the pacing interval with live countdown
+        if idx < total_downloaded - 1:
+            jitter = random.randint(-180, 180) if base_interval > 600 else 0
+            wait_time = max(120, base_interval + jitter)
+            wait_min = wait_time // 60
+            print(f"⏱️ [Pacing Sleep] Waiting ~{wait_min} minutes before next upload...")
+            
+            fb_put("schedule_state", {
+                "last_posted_at": time.time(),
+                "next_post_at": time.time() + wait_time,
+                "interval_seconds": wait_time,
+                "interval_minutes": wait_min
+            })
+            
+            end_sleep = time.time() + wait_time
+            while time.time() < end_sleep:
+                check_worker_lease()
+                c_batch = fb_get("active_batch")
+                if c_batch and c_batch.get("status") == "cancelled":
+                    print("🛑 Batch cancelled by user during wait!")
+                    return True
+                remaining_wait = int(end_sleep - time.time())
+                r_m = remaining_wait // 60
+                r_s = remaining_wait % 60
+                update_heartbeat(f"⏳ Anti-Spam Gap: Next video in {r_m}m {r_s}s (Posted {idx + 1}/{total_downloaded})", is_busy=False)
+                time.sleep(15)
+                
+    # Batch complete!
+    fb_patch("active_batch", {
+        "status": "completed",
+        "completed_count": total_downloaded,
+        "completed_at": datetime.now().isoformat()
+    })
+    update_heartbeat("🎉 Batch Completed! All selected videos posted cleanly.", is_busy=False)
+    print("\n" + "=" * 65)
+    print("🏁 [Batch Finished] All videos uploaded cleanly to Bideo! Container shutting down.")
+    print("=" * 65)
+    
+    # Auto-terminate container process cleanly
+    try:
+        os.system("pkill -9 -f jupyter")
+        os._exit(0)
+    except Exception:
+        pass
+        
+    return True
+
+
+# -------------------------------------------------------------
+# MAIN AUTONOMOUS LOOP
 # -------------------------------------------------------------
 print("\n🌟 [Kaggle Bideo Engine] Main Loop Active. Listening to Firebase...")
 
@@ -628,11 +843,10 @@ while True:
     if elapsed >= MAX_RUNTIME_SECONDS:
         print("\n" + "=" * 65)
         print("🛑 [11.5 Hour Cutoff Reached] Gracefully closing current session.")
-        print("🔄 Notifying Server to cancel and automatically launch the next session.")
         print("=" * 65)
         fb_put("kaggle_status", {
             "is_running": False,
-            "state": "renew_ready",
+            "state": "stopped",
             "last_heartbeat": time.time(),
             "reason": "11.5h runtime limit completed cleanly",
             "total_uploaded_count": total_uploaded_count
@@ -640,13 +854,20 @@ while True:
         break
 
     try:
-        # 1. Update live heartbeat
+        # 1. Check and process any on-demand selected video batch first!
+        batch_processed = process_active_batch()
+        if batch_processed:
+            # If batch finished or was handled, sleep briefly and recheck
+            time.sleep(10)
+            continue
+
+        # 2. Update live heartbeat
         update_heartbeat("Monitoring Channels & Upload Queue", is_busy=False)
 
-        # 2. Check and process any single upload requests from dashboard
+        # 3. Check and process any single upload requests from dashboard
         process_single_upload_queue()
 
-        # 3. Check and process any new channel pairing videos
+        # 4. Check and process any legacy channel pairings if present
         process_channel_pairings()
 
     except Exception as loop_err:
@@ -656,3 +877,9 @@ while True:
     time.sleep(20)
 
 print("🏁 Kaggle Bideo Engine session ended cleanly.")
+try:
+    import os
+    os.system("pkill -9 -f jupyter")
+    os._exit(0)
+except Exception:
+    pass

@@ -97,6 +97,14 @@ def static_files(path):
     return send_from_directory("../frontend", path)
 
 
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 # -------------------------------------------------------------
 # API: Categories
 # -------------------------------------------------------------
@@ -224,6 +232,192 @@ def create_pairing():
     )
 
     return jsonify({"success": True, "pairing": pairing_data})
+
+
+# -------------------------------------------------------------
+# CHANNEL VIDEO LIBRARY & ON-DEMAND BATCH QUEUE
+# -------------------------------------------------------------
+@app.route("/api/channels/fetch", methods=["POST"])
+def fetch_channel_videos():
+    """
+    Fetches videos from a YouTube channel via yt-dlp, saves all video records
+    into Firebase library under channels/<id>/videos, and returns the video list.
+    Preserves existing upload flags so already uploaded videos stay marked!
+    """
+    body = request.get_json() or {}
+    ch_input = body.get("channel_input", "").strip()
+    max_results = int(body.get("max_results") or 60)
+
+    if not ch_input:
+        return jsonify({"success": False, "message": "YouTube Channel URL ya @handle zaroori hai!"}), 400
+
+    try:
+        channel_meta, videos = YouTubeWorker.get_channel_info_and_videos(ch_input, max_results=max_results)
+        if not videos:
+            return jsonify({"success": False, "message": f"'{ch_input}' se koi video nahi mili! URL ya name check karein."}), 404
+
+        # Save to Firebase catalog
+        saved_channel = FirebaseClient.save_channel_and_videos(channel_meta, videos)
+
+        FirebaseClient.add_log(
+            "Channel Videos Fetched",
+            f"Fetched {len(videos)} videos from '{channel_meta.get('channel_name')}' into library",
+            "success",
+            {"channel": channel_meta.get("channel_name"), "count": len(videos)}
+        )
+
+        return jsonify({
+            "success": True,
+            "channel": saved_channel,
+            "videos": saved_channel.get("videos", [])
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Channel fetch error: {str(e)}"}), 500
+
+
+@app.route("/api/channels", methods=["GET"])
+def list_saved_channels():
+    """Lists all saved YouTube channels and their video counts."""
+    channels = FirebaseClient.get_all_channels()
+    return jsonify({"success": True, "channels": channels})
+
+
+@app.route("/api/channels/<channel_id>/videos", methods=["GET"])
+def get_channel_videos_route(channel_id):
+    """Returns all stored videos for a given channel, synced with uploaded state."""
+    videos = FirebaseClient.get_channel_videos(channel_id)
+    return jsonify({"success": True, "videos": videos})
+
+
+@app.route("/api/batch/start", methods=["POST"])
+def batch_start():
+    """
+    Pushes selected videos to Firebase as an active batch and launches
+    the Kaggle Bot ONCE for this specific task.
+    """
+    data = request.get_json() or {}
+    selected_videos = data.get("selected_videos") or []
+    bideo_user_id = data.get("bideo_user_id")
+    category_id = data.get("category_id", "")
+    category_name = data.get("category_name", "General")
+    pacing_hours = float(data.get("pacing_hours") or 9.0)
+
+    if not selected_videos:
+        return jsonify({"success": False, "message": "Kam se kam ek video select karein!"}), 400
+    if not bideo_user_id:
+        return jsonify({"success": False, "message": "Target Bideo Account select karein!"}), 400
+
+    # Verify Bideo account
+    bideo_acc = FirebaseClient.get_account_by_id(bideo_user_id)
+    if not bideo_acc:
+        return jsonify({"success": False, "message": "Select kiya gaya Bideo account nahi mila!"}), 404
+
+    # Build batch record
+    batch_id = f"batch_{int(time.time())}"
+    batch_data = {
+        "batch_id": batch_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "bideo_user_id": bideo_user_id,
+        "bideo_channel_name": bideo_acc.get("name") or bideo_acc.get("channelName", "Bideo Channel"),
+        "category_id": category_id,
+        "category_name": category_name,
+        "pacing_hours": pacing_hours,
+        "status": "queued",
+        "total_count": len(selected_videos),
+        "completed_count": 0,
+        "videos": selected_videos
+    }
+
+    # Save batch in Firebase
+    FirebaseClient.save_active_batch(batch_data)
+
+    # Launch Kaggle on-demand bot
+    config = KaggleManager.get_config()
+    user = config.get("kaggle_user")
+    key = config.get("kaggle_key")
+    slug = config.get("kaggle_slug", "bideo-automation-engine")
+
+    if not user or not key:
+        return jsonify({
+            "success": False,
+            "message": "Kaggle API Key configured nahi hai! Pehle Kaggle Settings me setup karein."
+        }), 400
+
+    ok, msg = KaggleManager.push_kernel(user, key, slug)
+    if ok:
+        try:
+            requests.put(
+                f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
+                json={
+                    "is_running": False,
+                    "state": "waiting_boot",
+                    "launched_at": datetime.now().isoformat(),
+                    "last_heartbeat": 0,
+                    "batch_id": batch_id,
+                    "total_videos": len(selected_videos),
+                    "current_task": f"Kaggle Bot launched! Pre-downloading {len(selected_videos)} videos...",
+                    "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
+                },
+                timeout=5
+            )
+        except Exception:
+            pass
+
+        FirebaseClient.add_log(
+            "Kaggle Batch Started",
+            f"Queued {len(selected_videos)} videos for '{bideo_acc.get('name')}', scheduled over ~{pacing_hours}h",
+            "success",
+            {"batch_id": batch_id, "count": len(selected_videos)}
+        )
+
+        return jsonify({
+            "success": True,
+            "message": f"Kaggle Bot launched! {len(selected_videos)} videos pre-download karke ~{pacing_hours} ghante me upload honge.",
+            "batch": batch_data,
+            "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
+        })
+    else:
+        return jsonify({"success": False, "message": f"Kaggle launch error: {msg}"}), 500
+
+
+@app.route("/api/batch/status", methods=["GET"])
+def batch_status():
+    """Returns active batch details & Kaggle live progress."""
+    batch = FirebaseClient.get_active_batch()
+    status = KaggleManager.get_status()
+    return jsonify({
+        "success": True,
+        "batch": batch,
+        "kaggle_status": status
+    })
+
+
+@app.route("/api/batch/cancel", methods=["POST"])
+def batch_cancel():
+    """Cancels active batch and stops running Kaggle session."""
+    FirebaseClient.clear_active_batch()
+    config = KaggleManager.get_config()
+    user = config.get("kaggle_user")
+    key = config.get("kaggle_key")
+    slug = config.get("kaggle_slug", "bideo-automation-engine")
+    if user and key:
+        KaggleManager.cancel_kernel(user, key, slug)
+
+    try:
+        requests.put(
+            f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
+            json={
+                "is_running": False,
+                "state": "stopped",
+                "current_task": "Batch cancelled by user",
+                "last_heartbeat": time.time()
+            },
+            timeout=5
+        )
+    except Exception:
+        pass
+
+    return jsonify({"success": True, "message": "Batch cancelled and Kaggle Bot stopped."})
 
 
 @app.route("/api/pairings/<pairing_id>", methods=["DELETE"])
@@ -712,21 +906,9 @@ def kaggle_download_notebook():
 
 
 # -------------------------------------------------------------
-# Start Background Automation Scheduler & Kaggle 24/7 Supervisor
+# On-Demand Localhost Studio Mode (Zero Background Runaways)
 # -------------------------------------------------------------
-k_cfg = KaggleManager.get_config()
-if not k_cfg.get("kaggle_user") or not k_cfg.get("auto_renew", True):
-    try:
-        AutomationScheduler.start()
-    except Exception as e:
-        print(f"[Scheduler Startup Notice] {e}")
-else:
-    print("[Local Server] Kaggle 24/7 Cloud Super-Engine is active. Local scheduler disabled to prevent duplicate uploads.")
-
-try:
-    KaggleManager.start_supervisor()
-except Exception as e:
-    print(f"[Kaggle Supervisor Startup Notice] {e}")
+print("[Local Server] Pure Localhost Studio Active. Automation runs on-demand per user selected batch.")
 
 
 if __name__ == "__main__":

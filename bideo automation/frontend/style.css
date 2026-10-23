@@ -1450,5 +1450,84 @@ select option {
   color: #FBBF24;
 }
 
+/* VIDEO GALLERY CARDS & CHECKBOX SELECTION */
+.gallery-video-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+.gallery-video-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 122, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.gallery-video-card.selected {
+  border-color: #FF7A00;
+  box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.5), 0 8px 24px rgba(255, 122, 0, 0.25);
+  background: rgba(255, 122, 0, 0.08);
+}
+.gallery-video-card.uploaded {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.gallery-card-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+.gallery-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.gallery-video-card:hover .gallery-card-thumb {
+  transform: scale(1.04);
+}
+
+.video-check-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+}
+.video-select-checkbox {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  accent-color: #FF7A00;
+  border-radius: 4px;
+}
+
+.video-type-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.video-type-badge.shorts {
+  color: #FF4757;
+  border: 1px solid rgba(255, 71, 87, 0.4);
+}
+.video-type-badge.long {
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
 
 

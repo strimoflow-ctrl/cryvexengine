@@ -22,6 +22,7 @@ class KaggleManager:
 
     _supervisor_thread = None
     _supervisor_running = False
+    _last_push_time = 0
 
     @classmethod
     def get_config(cls):
@@ -140,6 +141,7 @@ class KaggleManager:
     @classmethod
     def push_kernel(cls, kaggle_user, kaggle_key, kaggle_slug="bideo-automation-engine"):
         """Pushes compiled notebook to Kaggle API to launch execution."""
+        cls._last_push_time = time.time()
         notebook_code = cls.compile_notebook_json()
         credentials = base64.b64encode(f"{kaggle_user}:{kaggle_key}".encode()).decode("utf-8")
         headers = {
@@ -190,62 +192,9 @@ class KaggleManager:
 
     @classmethod
     def start_supervisor(cls):
-        """Starts background 24/7 Kaggle session renew supervisor thread."""
-        if cls._supervisor_running:
-            return
-
-        cls._supervisor_running = True
-
-        def _supervisor_loop():
-            print("🛡️ [Kaggle Supervisor] 24/7 Autonomous Renewal Monitor Started.")
-            while cls._supervisor_running:
-                try:
-                    config = cls.get_config()
-                    kaggle_user = config.get("kaggle_user")
-                    kaggle_key = config.get("kaggle_key")
-                    kaggle_slug = config.get("kaggle_slug", "bideo-automation-engine")
-                    auto_renew = config.get("auto_renew", True)
-
-                    if kaggle_user and kaggle_key and auto_renew:
-                        status = cls.get_status()
-                        is_running = status.get("is_running", False)
-                        last_hb = status.get("last_heartbeat", 0)
-                        state = status.get("state", "")
-                        now = time.time()
-
-                        # Conditions for renewal:
-                        # 1. State marked "renew_ready" (11.5 hours completed gracefully)
-                        # 2. Kernel stopped running or heartbeat dead for > 150 seconds
-                        hb_dead = (now - last_hb > 150) if last_hb > 0 else True
-                        should_renew = (not is_running) or (state == "renew_ready") or hb_dead
-
-                        if should_renew:
-                            print("[Kaggle Supervisor] Session renewal triggered! Cancelling old session...")
-                            cls.cancel_kernel(kaggle_user, kaggle_key, kaggle_slug)
-                            time.sleep(8)
-                            print("[Kaggle Supervisor] Launching fresh 11.5-hour Kaggle session...")
-                            ok, msg = cls.push_kernel(kaggle_user, kaggle_key, kaggle_slug)
-                            if ok:
-                                # Update status in Firebase
-                                try:
-                                    requests.put(
-                                        f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
-                                        json={
-                                            "is_running": True,
-                                            "state": "launching",
-                                            "launched_at": datetime.now().isoformat(),
-                                            "last_heartbeat": time.time(),
-                                            "current_task": "Booting fresh 11.5h Kaggle worker..."
-                                        },
-                                        timeout=5
-                                    )
-                                except Exception:
-                                    pass
-                except Exception as ex:
-                    print(f"[Kaggle Supervisor Notice] {ex}")
-
-                # Check every 45 seconds
-                time.sleep(45)
-
-        cls._supervisor_thread = threading.Thread(target=_supervisor_loop, daemon=True)
-        cls._supervisor_thread.start()
+        """
+        On-demand batch mode:
+        Continuous background auto-renew loop is disabled so Kaggle runs strictly
+        for the user's selected batch of videos and exits when done.
+        """
+        print("🎯 [Kaggle Engine] On-Demand Batch Mode Active. 24/7 auto-renewal disabled.")

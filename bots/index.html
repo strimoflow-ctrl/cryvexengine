@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bideo Growth Engine & Video Pipeline | Cryvex Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- BACKGROUND NEON GLOWS -->
+  <div class="glow-orb orb-purple"></div>
+  <div class="glow-orb orb-cyan"></div>
+  <div class="glow-orb orb-orange"></div>
+
+  <!-- TOP NAVIGATION -->
+  <header class="bot-nav">
+    <div class="nav-brand">
+      <div class="bot-logo">🚀</div>
+      <div>
+        <h2>Bideo <span>Growth Studio & Video Pipeline</span></h2>
+        <span class="sub-badge">Target Channel: <b>Cryvex</b> • Controlled Booster • Never Deletes Bots</span>
+      </div>
+    </div>
+    <div class="nav-links">
+      <button id="farmCoinsNavBtn" class="btn btn-secondary btn-sm">
+        <span>🪙 Farm Boost Coins</span>
+      </button>
+      <a href="http://localhost:5000" target="_blank" class="btn btn-secondary btn-sm">
+        <span>🎬 YouTube Automation Studio ↗</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="bot-container">
+
+    <!-- HERO SECTION: CRYVEX TARGET CHANNEL & FOLLOWER CONTROLLER -->
+    <section class="cryvex-hero-card glass-card">
+      <div class="cryvex-profile-col">
+        <div class="channel-avatar-wrap">
+          <img id="cryvexAvatar" src="https://pub-39d197c890b64644a9a1869b8f6740b1.r2.dev/images/1792711625547-612508265.jpg" alt="Cryvex Avatar" class="cryvex-avatar">
+          <div class="verified-pulse" title="Verified Target Channel">✓</div>
+        </div>
+        <div class="channel-details">
+          <div class="channel-title-row">
+            <h1 id="cryvexChannelName">Cryvex</h1>
+            <span class="handle-tag">@cryvex</span>
+            <span class="status-live-badge">🟢 Live on Bideo</span>
+          </div>
+          <p class="channel-id-text">Target ID: <code id="cryvexChannelId">6ada0b9dfb39968c7c48dd7b</code></p>
+          <div class="channel-stats-pills">
+            <div class="pill"><span class="pill-icon">👥</span> Followers: <b id="cryvexFollowersCount">22</b></div>
+            <div class="pill"><span class="pill-icon">🎬</span> Total Videos: <b id="cryvexVideosCount">13</b></div>
+            <div class="pill highlight-pill"><span class="pill-icon">🤖</span> Available Bots to Follow: <b id="cryvexAvailableBots">0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTROLLABLE FOLLOWER BOOSTER -->
+      <div class="cryvex-controller-box">
+        <div class="box-header">
+          <h3>⚡ Send Controlled Followers</h3>
+          <span class="safe-badge">🛡️ Smart De-duplication Active</span>
+        </div>
+        <p class="box-desc">Jitne bots chahein utne hi followers send karein. Jo bots follow kar chuke hain wo dobara use nahi honge aur <b>kabhi delete nahi honge</b> (views ke liye preserve rahenge).</p>
+
+        <div id="followAlert" class="alert-box hidden"></div>
+
+        <div class="controller-row">
+          <div class="preset-chips">
+            <button class="chip active" data-count="5">+5 Bots</button>
+            <button class="chip" data-count="10">+10 Bots</button>
+            <button class="chip" data-count="15">+15 Bots</button>
+            <button class="chip" data-count="all">All Available</button>
+          </div>
+          <div class="input-count-wrap">
+            <label for="followerCountInput">Count:</label>
+            <input type="number" id="followerCountInput" value="5" min="1" max="100">
+          </div>
+        </div>
+
+        <div class="bot-status-indicators">
+          <span id="trackerTotalBots">Total Vault: <b>16</b></span> •
+          <span id="trackerFollowed">Already Followed: <b>0</b></span> •
+          <span id="trackerAvailable">Ready to Follow: <b class="text-cyan">16</b></span>
+        </div>
+
+        <button id="sendFollowersBtn" class="btn btn-primary btn-block">
+          <span class="btn-text">🚀 Send Followers to Cryvex</span>
+          <span class="spinner hidden"></span>
+      </div>
+    </section>
+
+    <!-- SECTION 1.2: 24/7 AUTONOMOUS CLOUD FARMING CONTROLLER (BULL MODE) -->
+    <section class="farm-master-card glass-card">
+      <div class="farm-header-row">
+        <div class="farm-title-group">
+          <div class="farm-pulsing-icon">🌾</div>
+          <div>
+            <div class="flex-align-center gap-sm">
+              <h2>24/7 Autonomous Cloud Farming Engine <span class="badge-bull">BULL MODE</span></h2>
+              <span id="farmStatusBadge" class="status-live-badge">🟢 24/7 Active</span>
+            </div>
+            <p class="farm-desc">
+              Human simulation • 1 Bot/Hour (Max 150 Cap) • 🛡️ <b>Anti-Rush Drip-Feed (2-5m spacing)</b> • ⚡ <b>20m Review Auto-Passer</b> • 🌐 <b>Stealth Discovery Browsing</b>
+            </p>
+          </div>
+        </div>
+
+        <div class="farm-controls-right">
+          <button id="farmToggleBtn" class="btn btn-primary btn-sm">
+            <span id="farmToggleIcon">⏸️</span>
+            <span id="farmToggleText" class="btn-text">Pause Farm</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- METRIC TILES GRID -->
+      <div class="farm-metrics-grid">
+        <!-- TILE 1: BOT ARMY QUOTA -->
+        <div class="farm-tile">
+          <div class="tile-header">
+            <span class="tile-label">🤖 Bot Army Pool</span>
+            <span id="farmNextSpawnTag" class="tile-tag cyan-tag">Spawn in: 59m</span>
+          </div>
+          <div class="tile-val-row">
+            <span id="farmBotsCount" class="tile-main-val">47</span>
+            <span class="tile-max-val">/ 150 Max</span>
+          </div>
+          <div class="tile-progress-bar">
+            <div id="farmBotsFill" class="tile-progress-fill" style="width: 31%;"></div>
+          </div>
+          <span class="tile-subtext">Hourly spawner automatically follows Cryvex</span>
+        </div>
+
+        <!-- TILE 2: ANTI-RUSH ORGANIC PACING -->
+        <div class="farm-tile">
+          <div class="tile-header">
+            <span class="tile-label">🛡️ Anti-Rush Pacing</span>
+            <span class="tile-tag green-tag">Protected</span>
+          </div>
+          <div class="tile-val-row">
+            <span id="farmNextViewCountdown" class="tile-main-val text-cyan">02:45</span>
+            <span class="tile-unit">Next View</span>
+          </div>
+          <div class="tile-subtext">
+            <span>Drip-feeds 1 view every 2–5m (No view surge on new videos)</span>
+          </div>
+        </div>
+
+        <!-- TILE 3: CRYVEX ENGAGEMENT -->
+        <div class="farm-tile">
+          <div class="tile-header">
+            <span class="tile-label">🎬 Cryvex Delivery</span>
+            <span class="tile-tag orange-tag">Organic</span>
+          </div>
+          <div class="tile-val-row">
+            <span id="farmCryvexViews" class="tile-main-val text-orange">0</span>
+            <span class="tile-unit">Views</span>
+          </div>
+          <div class="tile-subtext">
+            <span id="farmCryvexInteractions">❤️ 0 Likes (50%) • 💬 0 Comments (30%)</span>
+          </div>
+        </div>
+
+        <!-- TILE 4: STEALTH & AUTO-PASS -->
+        <div class="farm-tile">
+          <div class="tile-header">
+            <span class="tile-label">🌐 Stealth & Watchdog</span>
+            <span id="farmWatchdogTag" class="tile-tag purple-tag">Every 20m</span>
+          </div>
+          <div class="tile-val-row">
+            <span id="farmStealthViews" class="tile-main-val text-purple">0</span>
+            <span class="tile-unit">Others Watched</span>
+          </div>
+          <div class="tile-subtext">
+            <span id="farmReviewsPassed">⚡ <b id="farmReviewsPassedVal">13</b> Videos Auto-Approved</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE TERMINAL CONSOLE -->
+      <div class="farm-terminal-card">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span class="terminal-title">LIVE FARMING ACTIVITY TERMINAL (STREAMING 24/7)</span>
+          <span class="terminal-refresh-pulse">● LIVE</span>
+        </div>
+        <div id="farmTerminalLogs" class="terminal-body">
+          <div class="term-line"><span class="term-time">[System]</span> <span class="term-msg">Initializing 24/7 Autonomous Farm Controller...</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1.5: CRYVEX COIN VAULT & HIGHLIGHT PIN POWER -->
+    <section class="coins-banner-card glass-card">
+      <div class="coins-banner-left">
+        <div class="coin-icon-bubble">🪙</div>
+        <div>
+          <div class="coin-balance-title">
+            <span>Cryvex Coin Vault:</span>
+            <b id="cryvexCoinsVal">32</b> <span class="coin-unit">Coins</span>
+            <span id="autoMinerBadge" class="auto-miner-badge">🤖 Auto-Miner Active</span>
+          </div>
+          <p id="autoMinerStatusText" class="auto-miner-live-status">Background me server automatically saare free coins claim kar raha hai...</p>
+          <div class="coin-progress-wrapper">
+            <div class="coin-progress-bar">
+              <div id="coinProgressFill" class="coin-progress-fill" style="width: 32%"></div>
+            </div>
+            <span id="coinProgressText" class="coin-progress-lbl">32 / 100 Coins (32%)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="coins-banner-right">
+        <div class="claim-info-box">
+          <span id="coinCooldownStatus" class="cooldown-tag ready">🟢 Ready to Claim!</span>
+          <span id="dailyAdsRemaining" class="ads-remaining-tag">9 Daily Claims Left</span>
+        </div>
+        <button id="claimCoinsBtn" class="btn btn-primary">
+          <span class="btn-text">🪙 Instant Claim (+2 to +5)</span>
+          <span class="spinner hidden"></span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- SECTION 2: CRYVEX VIDEOS PIPELINE & BULK BOOSTER -->
+    <section class="video-pipeline-section glass-card">
+      <div class="pipeline-header">
+        <div class="pipeline-title-group">
+          <div class="badge-icon orange-badge">🎬</div>
+          <div>
+            <h2>Cryvex Uploaded Videos Pipeline</h2>
+            <p>Aapke channel ke sabhi uploaded videos samne live hain. 1-click me Views, Watch-Time, Likes boost karein ya Home Feed Top par Pin karein!</p>
+          </div>
+        </div>
+        <div class="pipeline-actions">
+          <button id="passAllReviewsBtn" class="btn btn-warning btn-sm" title="Pass all in-review videos instantly without watching ads">⚡ 1-Click Pass All (No Ads)</button>
+          <button id="refreshVideosBtn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+          <button id="toggleBatchPanelBtn" class="btn btn-primary btn-sm">⚡ Batch Boost All</button>
+        </div>
+      </div>
+
+      <!-- BATCH BOOST ACCORDION PANEL -->
+      <div id="batchBoostPanel" class="batch-panel hidden">
+        <div class="batch-panel-content">
+          <h4>🚀 Batch Boost Configuration (All Videos)</h4>
+          <p>Ye configuration sabhi 13 videos me equally views, watch-time aur likes distribute karegi:</p>
+          <div class="batch-inputs-grid">
+            <div class="batch-field">
+              <label>Views Per Video</label>
+              <input type="number" id="batchViewsInput" value="5" min="1" max="30">
+            </div>
+            <div class="batch-field">
+              <label>Likes Per Video</label>
+              <input type="number" id="batchLikesInput" value="3" min="1" max="20">
+            </div>
+            <div class="batch-field">
+              <label>Watch-Time Retention</label>
+              <select id="batchWatchTimeSelect">
+                <option value="30">30 Seconds (High Retention)</option>
+                <option value="60">60 Seconds (Full Watch)</option>
+                <option value="15">15 Seconds (Shorts Pulse)</option>
+              </select>
+            </div>
+            <div class="batch-field flex-end">
+              <button id="executeBatchBoostBtn" class="btn btn-primary">
+                <span class="btn-text">💥 Launch Batch Boost Now</span>
+                <span class="spinner hidden"></span>
+              </button>
+            </div>
+          </div>
+          <div id="batchAlert" class="alert-box hidden"></div>
+        </div>
+      </div>
+
+      <div id="videoActionAlert" class="alert-box hidden"></div>
+
+      <!-- VIDEO CARDS GRID -->
+      <div id="videosGrid" class="videos-grid">
+        <div class="loading-state">
+          <div class="spinner-large"></div>
+          <p>Fetching uploaded videos from Bideo live server...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: BOT INVENTORY & 1-CLICK GENERATOR -->
+    <section class="bot-inventory-section">
+      <div class="two-col-grid">
+        
+        <!-- GENERATOR CARD -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <div class="badge-icon purple-badge">⚡</div>
+            <div>
+              <h3>1-Click Bot Generator (No OTP)</h3>
+              <p>Realistic Indian names, numbers aur instant JWT authentication</p>
+            </div>
+          </div>
+
+          <div id="genAlert" class="alert-box hidden"></div>
+
+          <div class="form-group">
+            <label for="customPrefix">Custom Name Prefix <span class="badge optional">Optional</span></label>
+            <input type="text" id="customPrefix" placeholder="e.g. rohit ya viral (khali chhodne par auto-generate)">
+          </div>
+
+          <div class="btn-group-row">
+            <button id="genSingleBtn" class="btn btn-primary flex-1">
+              <span class="btn-text">⚡ +1 Bot</span>
+              <span class="spinner hidden"></span>
+            </button>
+            <button id="gen5Btn" class="btn btn-secondary flex-1">
+              <span class="btn-text">🚀 +5 Bots</span>
+              <span class="spinner hidden"></span>
+            </button>
+            <button id="gen10Btn" class="btn btn-secondary flex-1">
+              <span class="btn-text">💥 +10 Bots</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VAULT STATS & LIST -->
+        <div class="card glass-card">
+          <div class="card-header space-between">
+            <div class="flex-align-center">
+              <div class="badge-icon cyan-badge">🔐</div>
+              <div>
+                <h3>Bot Army Vault (<span id="statTotalBots">0</span>)</h3>
+                <p>Click any bot to view credentials or token</p>
+              </div>
+            </div>
+            <button id="refreshBotsBtn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+          </div>
+
+          <div class="search-bar-wrap">
+            <input type="text" id="botFilterInput" placeholder="Search bots by name or phone...">
+          </div>
+
+          <div id="botsContainer" class="bots-grid compact-grid">
+            <div class="empty-state">Loading bot accounts...</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- CUSTOM BOOST MODAL FOR SINGLE VIDEO -->
+  <div id="videoBoostModal" class="modal-backdrop hidden">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <div class="flex-align-center">
+          <div class="badge-icon orange-badge">🚀</div>
+          <div>
+            <h3 id="modalVideoTitle">Boost Video</h3>
+            <span id="modalVideoId" class="modal-sub">ID: ...</span>
+          </div>
+        </div>
+        <button id="closeVideoModalBtn" class="close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="modalBoostAlert" class="alert-box hidden"></div>
+
+        <div class="form-group">
+          <label>Views Count to Send</label>
+          <input type="number" id="modalViewsCount" value="10" min="1" max="50">
+          <p class="helper-text">Kitne bot accounts se views bhejte hain.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Likes Count to Send</label>
+          <input type="number" id="modalLikesCount" value="5" min="0" max="30">
+          <p class="helper-text">Kitne bot accounts se likes bhejte hain.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Watch-Time Retention (Seconds)</label>
+          <select id="modalWatchTime">
+            <option value="30">30 Seconds (Recommended for Viral Trigger)</option>
+            <option value="60">60 Seconds (Full Retention)</option>
+            <option value="15">15 Seconds (Quick Pulse)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="confirmVideoBoostBtn" class="btn btn-primary btn-block">
+          <span class="btn-text">🚀 Deliver Boost Now</span>
+          <span class="spinner hidden"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCOUNT DETAILS MODAL -->
+  <div id="accountModal" class="modal-backdrop hidden">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <div class="flex-align-center">
+          <img id="modalAvatar" src="" class="modal-avatar" alt="Avatar">
+          <div>
+            <h3 id="modalName">User Name</h3>
+            <span id="modalId" class="modal-sub">ID: ...</span>
+          </div>
+        </div>
+        <button id="closeModalBtn" class="close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="credential-box">
+          <label>📱 Phone Number (Login)</label>
+          <div class="copy-input-row">
+            <input type="text" id="modalPhone" readonly>
+            <button class="btn btn-secondary btn-sm copy-btn" data-target="modalPhone">📋 Copy</button>
+          </div>
+        </div>
+
+        <div class="credential-box">
+          <label>🔒 Password</label>
+          <div class="copy-input-row">
+            <input type="text" id="modalPassword" readonly>
+            <button class="btn btn-secondary btn-sm copy-btn" data-target="modalPassword">📋 Copy</button>
+          </div>
+        </div>
+
+        <div class="credential-box">
+          <label>🔑 JWT Bearer Token</label>
+          <div class="copy-input-row">
+            <input type="text" id="modalToken" readonly>
+            <button class="btn btn-secondary btn-sm copy-btn" data-target="modalToken">📋 Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

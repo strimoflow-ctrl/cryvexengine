@@ -13,8 +13,7 @@ ENV/
 Bideo.apk
 *.apk
 
-# Local bots (managed locally via Desktop launcher)
-bots/
+# Local scripts
 *.bat
 
 # OS / Editor
@@ -24,3 +23,5 @@ Thumbs.db
 .idea/
 
 *.zip
+kagglelogs/
+*.log

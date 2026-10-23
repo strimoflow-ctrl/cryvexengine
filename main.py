@@ -2,36 +2,31 @@ import os
 import sys
 import subprocess
 
-# Determine directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.join(BASE_DIR, "bideo automation", "backend")
+BOTS_DIR = os.path.join(BASE_DIR, "bots")
 
-# If requirements.txt is present, ensure dependencies are installed
-req_file = os.path.join(BACKEND_DIR, "requirements.txt")
-if not os.path.exists(req_file):
-    req_file = os.path.join(BASE_DIR, "requirements.txt")
-
+req_file = os.path.join(BASE_DIR, "requirements.txt")
 if os.path.exists(req_file):
     try:
         import flask
-        import yt_dlp
-        import imageio_ffmpeg
+        import flask_cors
         import requests
     except ImportError:
-        print(">>> [Botkeep Boot] Installing Python dependencies...")
+        print(">>> [Cloud Boot] Installing Python dependencies...")
         subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "-r", req_file], check=True)
 
-# Add backend directory to path and switch cwd
-sys.path.insert(0, BACKEND_DIR)
-os.chdir(BACKEND_DIR)
+sys.path.insert(0, BOTS_DIR)
+os.chdir(BOTS_DIR)
 
-from app import app
+from server import app, AutoCoinMiner, AutonomousFarmEngine
 
 if __name__ == "__main__":
-    # Botkeep uses SERVER_PORT; other cloud hosts use PORT
-    port = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or 5000)
+    AutoCoinMiner.get_instance().start()
+    AutonomousFarmEngine.get_instance().start()
+
+    port = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or 5050)
     print("==================================================")
-    print(">>> BIDEO 24/7 AUTOMATION ENGINE ACTIVE (BOTKEEP)")
+    print(">>> BIDEO 24/7 AUTONOMOUS BOT FARMING ACTIVE")
     print(f">>> Listening on: 0.0.0.0:{port}")
     print("==================================================")
     app.run(host="0.0.0.0", port=port, debug=False)
