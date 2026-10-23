@@ -241,7 +241,8 @@ class YouTubeWorker:
             "ffmpeg_location": FFMPEG_EXE,
             "quiet": True,
             "no_warnings": True,
-            "writethumbnail": True
+            "writethumbnail": True,
+            "js_runtimes": {"node": {}, "deno": {}}
         }
 
         # If cookies are available, use them with standard web client (all formats available)
@@ -249,17 +250,25 @@ class YouTubeWorker:
             print(f"[YouTube Worker] Using saved cookies from: {cookie_file}")
             ydl_opts["cookiefile"] = cookie_file
 
+        # Fallback 1: Default yt-dlp selector (format=None) which automatically accepts whatever YouTube delivers
+        opts_auto = dict(ydl_opts)
+        opts_auto.pop("format", None)
+
+        # Fallback 2: Progressive / any stream
+        opts_any = dict(ydl_opts)
+        opts_any["format"] = "best/worst/b"
+
         meta = None
         attempts = [
             ("Primary 1080p stream", dict(ydl_opts)),
-            ("Universal stream fallback", {**ydl_opts, "format": "bestvideo+bestaudio/best"})
+            ("Auto-select any available stream", opts_auto),
+            ("Direct progressive stream", opts_any)
         ]
 
         if cookie_file:
-            no_cookie_opts = dict(ydl_opts)
-            no_cookie_opts.pop("cookiefile", None)
-            no_cookie_opts["format"] = "bestvideo+bestaudio/best"
-            attempts.append(("Fallback without cookies", no_cookie_opts))
+            no_cookie_auto = dict(opts_auto)
+            no_cookie_auto.pop("cookiefile", None)
+            attempts.append(("Auto fallback without cookies", no_cookie_auto))
 
         last_err = None
         for desc, opts in attempts:
