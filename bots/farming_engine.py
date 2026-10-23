@@ -108,11 +108,10 @@ class AutonomousFarmEngine:
         self.bot_spawn_interval = 3600  # 1 hour
         self.review_check_interval = 1200  # 20 minutes
 
-        # Anti-Rush Pacing: Random delay between 120s and 300s (2 to 5 minutes)
-        self.min_cryvex_delay = 120
-        self.max_cryvex_delay = 300
+        # Smart Catalog Rotation & Priority Ratio (80% Cryvex : 20% Stealth)
+        self.cryvex_ratio_counter = 0
+        self.video_last_viewed = {}  # vid_id -> timestamp
         self.last_cryvex_view_time = 0
-        self.next_cryvex_view_delay = random.randint(self.min_cryvex_delay, self.max_cryvex_delay)
 
         # Engagement probabilities
         self.cryvex_like_chance = 0.50
@@ -350,35 +349,33 @@ class AutonomousFarmEngine:
     # WORKER 3: Organic Human Farming & Stealth Rotation
     # -------------------------------------------------------------
     def _farming_loop(self):
-        time.sleep(15)
+        time.sleep(10)
         while self.running:
             try:
-                now = time.time()
-                elapsed_cryvex = now - self.last_cryvex_view_time
-
-                # 1. Check if Anti-Rush Window has elapsed for Cryvex
-                if elapsed_cryvex >= self.next_cryvex_view_delay:
-                    # TIME TO DELIVER AN ORGANIC CRYVEX VIEW!
+                # 80% Priority on Cryvex: 3 to 4 Cryvex views for every 1 Stealth browse
+                if self.cryvex_ratio_counter < 3 or random.random() < 0.75:
                     delivered = self._execute_organic_cryvex_view()
                     if delivered:
-                        self.last_cryvex_view_time = time.time()
-                        # Pick new organic delay between 2 and 5 minutes (120s to 300s)
-                        self.next_cryvex_view_delay = random.randint(self.min_cryvex_delay, self.max_cryvex_delay)
-                        mins = round(self.next_cryvex_view_delay / 60, 1)
-                        self._log("Anti-Rush Timer", f"Pacing next Cryvex view by {mins} minutes to ensure organic growth.", "info")
+                        self.cryvex_ratio_counter += 1
+                        # Human reading & watch gap (25s to 45s between views)
+                        delay = random.randint(25, 45)
+                        self.state["next_cryvex_view_seconds"] = delay
+                        time.sleep(delay)
                     else:
                         time.sleep(10)
                 else:
-                    # 2. IN ANTI-RUSH WINDOW: Perform Stealth Browsing on 3rd party videos!
+                    # Occasional stealth browsing on public explore feed
                     self._execute_stealth_browsing()
-                    time.sleep(random.randint(20, 45))
+                    self.cryvex_ratio_counter = 0
+                    delay = random.randint(20, 35)
+                    time.sleep(delay)
 
             except Exception as e:
                 self._log("Farming Loop Error", str(e), "error")
                 time.sleep(15)
 
     # -------------------------------------------------------------
-    # Organic Cryvex Interaction (1 bot, human pacing)
+    # Organic Cryvex Interaction (Smart Catalog Rotation)
     # -------------------------------------------------------------
     def _execute_organic_cryvex_view(self):
         bots = BotEngine.get_all_bots()
@@ -392,11 +389,13 @@ class AutonomousFarmEngine:
         if not videos:
             return False
 
-        # Sort: give slight weight to newer videos, but keep old videos in rotation
-        # Bideo videos have createdAt or _id
-        target_video = random.choice(videos)
+        # Smart Catalog Rotation: Pick the video least recently viewed
+        now = time.time()
+        videos.sort(key=lambda v: self.video_last_viewed.get(v.get("_id"), 0))
+        target_video = videos[0]
         vid_id = target_video.get("_id")
         title = target_video.get("title", "Video")
+        self.video_last_viewed[vid_id] = now
 
         # Pick a bot
         bot = random.choice(active_bots)
