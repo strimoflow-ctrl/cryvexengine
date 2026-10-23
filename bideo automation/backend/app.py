@@ -563,17 +563,22 @@ def kaggle_start():
             requests.put(
                 f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
                 json={
-                    "is_running": True,
-                    "state": "launching",
+                    "is_running": False,
+                    "state": "waiting_heartbeat",
                     "launched_at": datetime.now().isoformat(),
-                    "last_heartbeat": time.time(),
-                    "current_task": "Launching Kaggle Engine via API..."
+                    "last_heartbeat": 0,
+                    "current_task": "Kaggle notebook deployed! Waiting for Google Cloud boot...",
+                    "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
                 },
                 timeout=5
             )
         except Exception:
             pass
-        return jsonify({"success": True, "message": "Kaggle 24/7 Cloud Super-Engine start ho gaya!"})
+        return jsonify({
+            "success": True,
+            "message": f"Kaggle Job Deployed! Notebook: https://www.kaggle.com/code/{user}/{slug}",
+            "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
+        })
     else:
         return jsonify({"success": False, "message": f"Kaggle API Error: {msg}"}), 500
 

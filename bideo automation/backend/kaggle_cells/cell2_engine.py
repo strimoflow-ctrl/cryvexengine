@@ -101,6 +101,9 @@ def update_heartbeat(current_task="Idle - Monitoring channels & queue", is_busy=
     }
     fb_put("kaggle_status", status_data)
 
+# Send immediate startup heartbeat
+update_heartbeat("Booted on Google Cloud - Engine Active!", is_busy=False)
+
 
 # -------------------------------------------------------------
 # FFmpeg & VIDEO PROCESSING HELPERS

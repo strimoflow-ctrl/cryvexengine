@@ -1074,11 +1074,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const kaggleAlert = document.getElementById('kaggleAlert');
   const kaggleUserInput = document.getElementById('kaggleUserInput');
   const kaggleKeyInput = document.getElementById('kaggleKeyInput');
+  const kaggleSlugInput = document.getElementById('kaggleSlugInput');
   const kaggleAutoRenewCheck = document.getElementById('kaggleAutoRenewCheck');
   const saveKaggleConfigBtn = document.getElementById('saveKaggleConfigBtn');
 
   const startKaggleBtn = document.getElementById('startKaggleBtn');
   const stopKaggleBtn = document.getElementById('stopKaggleBtn');
+  const kaggleNotebookLink = document.getElementById('kaggleNotebookLink');
 
   let kaggleConfigCache = {};
 
@@ -1092,8 +1094,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const status = data.status || {};
       kaggleConfigCache = data.config || {};
 
-      const isRunning = status.is_running && (Date.now() / 1000 - (status.last_heartbeat || 0) < 180);
-      const isLaunching = status.state === 'launching';
+      const user = kaggleConfigCache.kaggle_user || 'professorcryvex';
+      const slug = kaggleConfigCache.kaggle_slug || 'bideo-automation-engine';
+
+      if (kaggleNotebookLink) {
+        kaggleNotebookLink.href = status.kaggle_url || `https://www.kaggle.com/code/${user}/${slug}`;
+      }
+
+      // ONLY active if Kaggle Python engine actually sent a heartbeat within the last 60 seconds!
+      const isRunning = status.is_running === true && (Date.now() / 1000 - (status.last_heartbeat || 0) < 60);
+      const isWaiting = status.state === 'waiting_heartbeat' || status.state === 'launching';
 
       if (isRunning) {
         kaggleStatusBadge.textContent = '🟢 Active (Google Cloud)';
@@ -1115,12 +1125,12 @@ document.addEventListener('DOMContentLoaded', () => {
           startKaggleBtn.style.color = '#fff';
         }
         if (stopKaggleBtn) stopKaggleBtn.classList.remove('hidden');
-      } else if (isLaunching) {
-        kaggleStatusBadge.textContent = '🟡 Launching...';
+      } else if (isWaiting) {
+        kaggleStatusBadge.textContent = '🟡 Waiting for Kaggle Boot...';
         kaggleStatusBadge.style.background = 'rgba(234, 179, 8, 0.2)';
         kaggleStatusBadge.style.color = '#facc15';
         kaggleStatusBadge.style.borderColor = '#eab308';
-        kaggleStatusSubtext.textContent = 'Kaggle cloud worker boot ho raha hai, please wait 30 seconds...';
+        kaggleStatusSubtext.textContent = 'Kaggle par deploy ho gaya! Cloud boot aur first heartbeat ka wait ho raha hai (~30s)...';
         if (kaggleActiveStrip) kaggleActiveStrip.classList.add('hidden');
         if (stopKaggleBtn) stopKaggleBtn.classList.remove('hidden');
       } else {
@@ -1149,6 +1159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (kaggleConfigCache.kaggle_user) {
           kaggleUserInput.value = kaggleConfigCache.kaggle_user;
         }
+        if (kaggleSlugInput && kaggleConfigCache.kaggle_slug) {
+          kaggleSlugInput.value = kaggleConfigCache.kaggle_slug;
+        }
         if (kaggleConfigCache.auto_renew !== undefined) {
           kaggleAutoRenewCheck.checked = kaggleConfigCache.auto_renew;
         }
@@ -1164,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const user = kaggleUserInput.value.trim();
         const key = kaggleKeyInput.value.trim();
+        const slug = (kaggleSlugInput ? kaggleSlugInput.value.trim() : '') || 'bideo-automation-engine';
         const autoRenew = kaggleAutoRenewCheck.checked;
 
         if (!user || !key) {
@@ -1184,6 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
               kaggle_user: user,
               kaggle_key: key,
+              kaggle_slug: slug,
               auto_renew: autoRenew
             })
           });

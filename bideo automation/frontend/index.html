@@ -184,8 +184,11 @@
 
             <!-- ACTION BUTTONS -->
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <a id="kaggleNotebookLink" href="https://www.kaggle.com/code/professorcryvex/bideo-automation-engine" target="_blank" class="btn btn-secondary btn-sm" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: flex; align-items: center; gap: 6px;">
+                🔗 View Notebook on Kaggle
+              </a>
               <button id="openKaggleModalBtn" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px;">
-                ⚙️ Setup API Key
+                ⚙️ Setup API Key & Slug
               </button>
               <button id="startKaggleBtn" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #00C853 0%, #64DD17 100%); border: none; color: #000; font-weight: 700; display: flex; align-items: center; gap: 6px;">
                 🚀 Start 24/7 Engine
@@ -632,6 +635,14 @@
           <div class="form-group">
             <label for="kaggleKeyInput">Kaggle API Key (Token) <span class="required">*</span></label>
             <input type="password" id="kaggleKeyInput" placeholder="e.g. 8a3f89b0231..." required>
+          </div>
+
+          <div class="form-group">
+            <label for="kaggleSlugInput">Kaggle Notebook Slug / Name <span class="required">*</span></label>
+            <input type="text" id="kaggleSlugInput" placeholder="bideo-automation-engine" value="bideo-automation-engine" required>
+            <p class="helper-text" style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">
+              Aapke Kaggle account par notebook ka URL banega: <code>https://www.kaggle.com/code/YOUR_USER/YOUR_SLUG</code>
+            </p>
           </div>
 
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 14px; margin-bottom: 20px;">
