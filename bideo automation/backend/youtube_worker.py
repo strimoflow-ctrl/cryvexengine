@@ -40,7 +40,12 @@ class YouTubeWorker:
             "playlistend": max_results,
             "quiet": True,
             "ignoreerrors": True,
-            "no_warnings": True
+            "no_warnings": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "android", "mweb"]
+                }
+            }
         }
 
         videos = []
@@ -211,6 +216,17 @@ class YouTubeWorker:
             "best"
         )
 
+        # Check for cookies file if provided
+        cookie_file = None
+        for cand in [
+            os.path.join(os.path.dirname(__file__), "cookies.txt"),
+            os.path.join(os.getcwd(), "cookies.txt"),
+            os.path.join(os.path.expanduser("~"), "cookies.txt")
+        ]:
+            if os.path.exists(cand) and os.path.getsize(cand) > 0:
+                cookie_file = cand
+                break
+
         ydl_opts = {
             "format": format_selector,
             "outtmpl": output_template,
@@ -218,114 +234,134 @@ class YouTubeWorker:
             "ffmpeg_location": FFMPEG_EXE,
             "quiet": True,
             "no_warnings": True,
-            "writethumbnail": True
+            "writethumbnail": True,
+            # Bypasses "Sign in to confirm you're not a bot" on Datacenter/Cloud IPs (Botkeep/VPS)
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "android", "mweb"]
+                }
+            },
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
         }
+        if cookie_file:
+            ydl_opts["cookiefile"] = cookie_file
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(video_url, download=True)
-            video_id = meta.get("id")
-            title = meta.get("title", "Untitled Video")
-            description = meta.get("description", "")
-            duration = meta.get("duration", 0)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                meta = ydl.extract_info(video_url, download=True)
+        except Exception as dl_err:
+            print(f"[YouTube Worker Warning] Primary format failed: {dl_err}. Retrying with universal mobile format...")
+            fallback_opts = dict(ydl_opts)
+            fallback_opts["format"] = "best[height<=1080]/best[height<=720]/best"
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                meta = ydl.extract_info(video_url, download=True)
 
-            # Locate downloaded video file
-            expected_mp4 = os.path.join(output_dir, f"{video_id}.mp4")
-            if not os.path.exists(expected_mp4):
-                # Search directory for file matching video_id
-                for f in os.listdir(output_dir):
-                    if f.startswith(video_id) and f.endswith((".mp4", ".mkv", ".webm")):
-                        expected_mp4 = os.path.join(output_dir, f)
-                        break
+        video_id = meta.get("id")
+        title = meta.get("title", "Untitled Video")
+        description = meta.get("description", "")
+        duration = meta.get("duration", 0)
 
-            # -------------------------------------------------------------
-            # STORAGE SAFEGUARD (< 500MB ENFORCEMENT)
-            # -------------------------------------------------------------
-            MAX_BYTES = 470 * 1024 * 1024  # 470 MB strict ceiling
-            if os.path.exists(expected_mp4):
-                curr_size = os.path.getsize(expected_mp4)
-                if curr_size > MAX_BYTES:
-                    curr_mb = curr_size / (1024 * 1024)
-                    print(f"⚠️ [Storage Safeguard] Video size {curr_mb:.1f}MB exceeds 470MB! Downscaling quality to ensure under 500MB...")
-                    
-                    compressed_mp4 = os.path.join(output_dir, f"{video_id}_safe.mp4")
-                    # Step 1: Transcode to 720p with CRF 28
-                    cmd = [
-                        FFMPEG_EXE, "-y",
-                        "-i", expected_mp4,
-                        "-vf", "scale='min(1280,iw)':-2",
-                        "-c:v", "libx264",
-                        "-crf", "28",
-                        "-preset", "faster",
-                        "-c:a", "aac",
-                        "-b:a", "128k",
-                        compressed_mp4
-                    ]
-                    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                    # If still > MAX_BYTES, compress more aggressively to 480p with CRF 32
-                    if os.path.exists(compressed_mp4):
-                        comp_size = os.path.getsize(compressed_mp4)
-                        if comp_size > MAX_BYTES:
-                            low_mp4 = os.path.join(output_dir, f"{video_id}_low.mp4")
-                            cmd_low = [
-                                FFMPEG_EXE, "-y",
-                                "-i", compressed_mp4,
-                                "-vf", "scale='min(854,iw)':-2",
-                                "-c:v", "libx264",
-                                "-crf", "32",
-                                "-preset", "faster",
-                                "-c:a", "aac",
-                                "-b:a", "96k",
-                                low_mp4
-                            ]
-                            subprocess.run(cmd_low, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                            if os.path.exists(low_mp4) and os.path.getsize(low_mp4) > 0:
-                                os.remove(compressed_mp4)
-                                compressed_mp4 = low_mp4
-
-                        if os.path.getsize(compressed_mp4) > 0:
-                            try:
-                                os.remove(expected_mp4)
-                            except Exception:
-                                pass
-                            expected_mp4 = compressed_mp4
-                            final_mb = os.path.getsize(expected_mp4) / (1024 * 1024)
-                            print(f"✅ [Storage Safeguard] Video successfully downscaled to {final_mb:.1f}MB (< 500MB).")
-
-            # Locate downloaded thumbnail or auto-generate via FFmpeg
-            thumb_path = os.path.join(output_dir, f"{video_id}_thumb.jpg")
-            native_thumb = None
-            for ext in [".webp", ".jpg", ".png", ".jpeg"]:
-                candidate = os.path.join(output_dir, f"{video_id}{ext}")
-                if os.path.exists(candidate):
-                    native_thumb = candidate
+        # Locate downloaded video file
+        expected_mp4 = os.path.join(output_dir, f"{video_id}.mp4")
+        if not os.path.exists(expected_mp4):
+            # Search directory for file matching video_id
+            for f in os.listdir(output_dir):
+                if f.startswith(video_id) and f.endswith((".mp4", ".mkv", ".webm")):
+                    expected_mp4 = os.path.join(output_dir, f)
                     break
 
-            if native_thumb:
-                # Convert native thumb to high-res JPG
-                cmd = [FFMPEG_EXE, "-y", "-i", native_thumb, "-q:v", "2", thumb_path]
+        # -------------------------------------------------------------
+        # STORAGE SAFEGUARD (< 500MB ENFORCEMENT)
+        # -------------------------------------------------------------
+        MAX_BYTES = 470 * 1024 * 1024  # 470 MB strict ceiling
+        if os.path.exists(expected_mp4):
+            curr_size = os.path.getsize(expected_mp4)
+            if curr_size > MAX_BYTES:
+                curr_mb = curr_size / (1024 * 1024)
+                print(f"⚠️ [Storage Safeguard] Video size {curr_mb:.1f}MB exceeds 470MB! Downscaling quality to ensure under 500MB...")
+                
+                compressed_mp4 = os.path.join(output_dir, f"{video_id}_safe.mp4")
+                # Step 1: Transcode to 720p with CRF 28
+                cmd = [
+                    FFMPEG_EXE, "-y",
+                    "-i", expected_mp4,
+                    "-vf", "scale='min(1280,iw)':-2",
+                    "-c:v", "libx264",
+                    "-crf", "28",
+                    "-preset", "faster",
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    compressed_mp4
+                ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
-                # Generate from 1s frame using FFmpeg
-                cls.extract_frame_thumbnail(expected_mp4, thumb_path)
+                # If still > MAX_BYTES, compress more aggressively to 480p with CRF 32
+                if os.path.exists(compressed_mp4):
+                    comp_size = os.path.getsize(compressed_mp4)
+                    if comp_size > MAX_BYTES:
+                        low_mp4 = os.path.join(output_dir, f"{video_id}_low.mp4")
+                        cmd_low = [
+                            FFMPEG_EXE, "-y",
+                            "-i", compressed_mp4,
+                            "-vf", "scale='min(854,iw)':-2",
+                            "-c:v", "libx264",
+                            "-crf", "32",
+                            "-preset", "faster",
+                            "-c:a", "aac",
+                            "-b:a", "96k",
+                            low_mp4
+                        ]
+                        subprocess.run(cmd_low, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        if os.path.exists(low_mp4) and os.path.getsize(low_mp4) > 0:
+                            os.remove(compressed_mp4)
+                            compressed_mp4 = low_mp4
 
-            # Extract video dimensions and duration info
-            video_info = cls.extract_video_info(expected_mp4)
-            if duration:
-                video_info["duration"] = duration
+                    if os.path.getsize(compressed_mp4) > 0:
+                        try:
+                            os.remove(expected_mp4)
+                        except Exception:
+                            pass
+                        expected_mp4 = compressed_mp4
+                        final_mb = os.path.getsize(expected_mp4) / (1024 * 1024)
+                        print(f"✅ [Storage Safeguard] Video successfully downscaled to {final_mb:.1f}MB (< 500MB).")
 
-            return {
-                "video_id": video_id,
-                "title": title,
-                "description": description,
-                "video_path": expected_mp4,
-                "thumb_path": thumb_path,
-                "duration": video_info["duration"],
-                "width": video_info["width"],
-                "height": video_info["height"],
-                "is_short": video_info["is_short"]
-            }
+        # Locate downloaded thumbnail or auto-generate via FFmpeg
+        thumb_path = os.path.join(output_dir, f"{video_id}_thumb.jpg")
+        native_thumb = None
+        for ext in [".webp", ".jpg", ".png", ".jpeg"]:
+            candidate = os.path.join(output_dir, f"{video_id}{ext}")
+            if os.path.exists(candidate):
+                native_thumb = candidate
+                break
+
+        if native_thumb:
+            # Convert native thumb to high-res JPG
+            cmd = [FFMPEG_EXE, "-y", "-i", native_thumb, "-q:v", "2", thumb_path]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+            # Generate from 1s frame using FFmpeg
+            cls.extract_frame_thumbnail(expected_mp4, thumb_path)
+
+        # Extract video dimensions and duration info
+        video_info = cls.extract_video_info(expected_mp4)
+        if duration:
+            video_info["duration"] = duration
+
+        return {
+            "video_id": video_id,
+            "title": title,
+            "description": description,
+            "video_path": expected_mp4,
+            "thumb_path": thumb_path,
+            "duration": video_info["duration"],
+            "width": video_info["width"],
+            "height": video_info["height"],
+            "is_short": video_info["is_short"]
+        }
 
     @staticmethod
     def extract_frame_thumbnail(video_path, output_thumb_path, timestamp="00:00:01"):

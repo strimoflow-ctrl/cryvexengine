@@ -1,9 +1,18 @@
 import os
+import sys
 import time
 import shutil
 import tempfile
 import threading
 from datetime import datetime
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from firebase_client import FirebaseClient
 from bideo_client import BideoClient
 from youtube_worker import YouTubeWorker
