@@ -278,6 +278,40 @@ def sync_all():
 
 
 # -------------------------------------------------------------
+# API: Save YouTube Cookies (For Cloud / Botkeep Bypass)
+# -------------------------------------------------------------
+@app.route("/api/save_cookies", methods=["POST"])
+def save_cookies():
+    try:
+        data = request.get_json() or {}
+        cookies_text = data.get("cookies_text", "").strip()
+        if not cookies_text:
+            return jsonify({"success": False, "message": "Cookies text cannot be empty"}), 400
+
+        cookie_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            f.write(cookies_text)
+
+        return jsonify({
+            "success": True,
+            "message": "YouTube Cookies successfully save ho gayi hain! Ab Botkeep server pe zero bot error ke sath download hoga."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/cookies_status", methods=["GET"])
+def cookies_status():
+    cookie_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+    has_cookies = os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 10
+    return jsonify({
+        "success": True,
+        "has_cookies": has_cookies,
+        "size_bytes": os.path.getsize(cookie_path) if has_cookies else 0
+    })
+
+
+# -------------------------------------------------------------
 # API: Automation Activity Logs
 # -------------------------------------------------------------
 @app.route("/api/logs", methods=["GET"])

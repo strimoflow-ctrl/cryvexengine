@@ -154,6 +154,9 @@
               <span class="btn-text">⚡ Run Master Sync Now</span>
               <span class="spinner hidden"></span>
             </button>
+            <button id="openCookiesModalBtn" class="btn btn-secondary btn-sm btn-block" style="margin-top: 8px;">
+              🍪 Cloud Cookies Setup
+            </button>
           </div>
         </div>
 
@@ -483,7 +486,45 @@
         </div>
       </section>
 
-    </main>
+    <!-- YOUTUBE COOKIES MODAL FOR BOTKEEP CLOUD -->
+    <div id="cookiesModal" class="modal-overlay hidden">
+      <div class="modal-card glass-card">
+        <div class="modal-header space-between">
+          <div class="flex-align-center">
+            <span class="badge-icon">🍪</span>
+            <div>
+              <h3>YouTube Cookies (Botkeep Cloud Bypass)</h3>
+              <p>Botkeep cloud datacenter pe bot block bypass karne ke liye cookies paste karein</p>
+            </div>
+          </div>
+          <button id="closeCookiesModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+
+        <div id="cookiesAlert" class="alert-box hidden"></div>
+
+        <div class="cookies-status-indicator" style="margin-bottom: 14px; font-size: 0.88rem;">
+          Status: <span id="cookiesStatusText" style="font-weight: 600; color: #9CA3AF;">Checking...</span>
+        </div>
+
+        <form id="cookiesForm">
+          <div class="form-group">
+            <label for="cookiesTextInput">Paste cookies.txt Content (Netscape Format)</label>
+            <textarea id="cookiesTextInput" rows="8" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;1780000000&#9;VISITOR_INFO1_LIVE&#9;..."></textarea>
+            <p class="helper-text">
+              Browser (Chrome/Edge) me <b>"Get cookies.txt LOCALLY"</b> extension se YouTube.com ka cookies export karke yahan paste karein.
+            </p>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" id="saveCookiesBtn" class="btn btn-primary btn-block">
+              <span class="btn-text">💾 Save Cookies to Server</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 
   <script src="app.js"></script>

@@ -144,6 +144,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // -----------------------------------------------------------
+  // YouTube Cloud Cookies Modal Logic
+  // -----------------------------------------------------------
+  const openCookiesModalBtn = document.getElementById('openCookiesModalBtn');
+  const closeCookiesModalBtn = document.getElementById('closeCookiesModalBtn');
+  const cookiesModal = document.getElementById('cookiesModal');
+  const cookiesForm = document.getElementById('cookiesForm');
+  const cookiesTextInput = document.getElementById('cookiesTextInput');
+  const cookiesAlert = document.getElementById('cookiesAlert');
+  const cookiesStatusText = document.getElementById('cookiesStatusText');
+  const saveCookiesBtn = document.getElementById('saveCookiesBtn');
+
+  async function checkCookiesStatus() {
+    if (!cookiesStatusText) return;
+    try {
+      const res = await fetch('/api/cookies_status');
+      const data = await res.json();
+      if (data.has_cookies) {
+        cookiesStatusText.innerHTML = `<span style="color:#34D399;">🟢 Active (${data.size_bytes} bytes saved)</span>`;
+      } else {
+        cookiesStatusText.innerHTML = `<span style="color:#EF4444;">🔴 Missing (Required for Botkeep Cloud IP)</span>`;
+      }
+    } catch (e) {
+      cookiesStatusText.textContent = 'Unknown';
+    }
+  }
+
+  if (openCookiesModalBtn) {
+    openCookiesModalBtn.addEventListener('click', () => {
+      cookiesModal.classList.remove('hidden');
+      checkCookiesStatus();
+    });
+  }
+
+  if (closeCookiesModalBtn) {
+    closeCookiesModalBtn.addEventListener('click', () => {
+      cookiesModal.classList.add('hidden');
+    });
+  }
+
+  if (cookiesForm) {
+    cookiesForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      cookiesAlert.classList.add('hidden');
+      const text = cookiesTextInput.value.trim();
+      if (!text) {
+        cookiesAlert.textContent = 'Kripya cookies.txt ka text yahan paste karein.';
+        cookiesAlert.className = 'alert-box alert-error';
+        cookiesAlert.classList.remove('hidden');
+        return;
+      }
+
+      const btnText = saveCookiesBtn.querySelector('.btn-text');
+      const spinner = saveCookiesBtn.querySelector('.spinner');
+      btnText.textContent = 'Saving...';
+      spinner.classList.remove('hidden');
+      saveCookiesBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/save_cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies_text: text })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save');
+
+        cookiesAlert.textContent = data.message;
+        cookiesAlert.className = 'alert-box alert-success';
+        cookiesAlert.classList.remove('hidden');
+        cookiesTextInput.value = '';
+        checkCookiesStatus();
+
+        setTimeout(() => {
+          cookiesModal.classList.add('hidden');
+        }, 2000);
+      } catch (err) {
+        cookiesAlert.textContent = err.message;
+        cookiesAlert.className = 'alert-box alert-error';
+        cookiesAlert.classList.remove('hidden');
+      } finally {
+        btnText.textContent = '💾 Save Cookies to Server';
+        spinner.classList.add('hidden');
+        saveCookiesBtn.disabled = false;
+      }
+    });
+  }
+
   logoutBtn.addEventListener('click', async () => {
     accountDropdownMenu.classList.add('hidden');
     if (!currentActiveAccount) return;
