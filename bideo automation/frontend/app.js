@@ -1056,7 +1056,209 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // -----------------------------------------------------------
+  // Kaggle 24/7 Cloud Super-Engine Integration
+  // -----------------------------------------------------------
+  const kaggleStatusBadge = document.getElementById('kaggleStatusBadge');
+  const kaggleStatusSubtext = document.getElementById('kaggleStatusSubtext');
+  const kaggleActiveStrip = document.getElementById('kaggleActiveStrip');
+  const kaggleUptimeText = document.getElementById('kaggleUptimeText');
+  const kaggleRenewInText = document.getElementById('kaggleRenewInText');
+  const kaggleLiveTaskText = document.getElementById('kaggleLiveTaskText');
+  const kaggleUploadCountText = document.getElementById('kaggleUploadCountText');
+
+  const openKaggleModalBtn = document.getElementById('openKaggleModalBtn');
+  const closeKaggleModalBtn = document.getElementById('closeKaggleModalBtn');
+  const cancelKaggleModalBtn = document.getElementById('cancelKaggleModalBtn');
+  const kaggleConfigModal = document.getElementById('kaggleConfigModal');
+  const kaggleConfigForm = document.getElementById('kaggleConfigForm');
+  const kaggleAlert = document.getElementById('kaggleAlert');
+  const kaggleUserInput = document.getElementById('kaggleUserInput');
+  const kaggleKeyInput = document.getElementById('kaggleKeyInput');
+  const kaggleAutoRenewCheck = document.getElementById('kaggleAutoRenewCheck');
+  const saveKaggleConfigBtn = document.getElementById('saveKaggleConfigBtn');
+
+  const startKaggleBtn = document.getElementById('startKaggleBtn');
+  const stopKaggleBtn = document.getElementById('stopKaggleBtn');
+
+  let kaggleConfigCache = {};
+
+  async function loadKaggleStatus() {
+    if (!kaggleStatusBadge) return;
+    try {
+      const res = await fetch('/api/kaggle/status');
+      const data = await res.json();
+      if (!data.success) return;
+
+      const status = data.status || {};
+      kaggleConfigCache = data.config || {};
+
+      const isRunning = status.is_running && (Date.now() / 1000 - (status.last_heartbeat || 0) < 180);
+      const isLaunching = status.state === 'launching';
+
+      if (isRunning) {
+        kaggleStatusBadge.textContent = '🟢 Active (Google Cloud)';
+        kaggleStatusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+        kaggleStatusBadge.style.color = '#4ade80';
+        kaggleStatusBadge.style.borderColor = '#22c55e';
+
+        kaggleStatusSubtext.textContent = 'Multi-gigabit Google Cloud network active. Zero bot block video sync in progress.';
+        if (kaggleActiveStrip) kaggleActiveStrip.classList.remove('hidden');
+
+        if (kaggleUptimeText) kaggleUptimeText.textContent = status.uptime_str || '0h 0m';
+        if (kaggleRenewInText) kaggleRenewInText.textContent = status.renew_in_str || '11h 30m';
+        if (kaggleLiveTaskText) kaggleLiveTaskText.textContent = status.current_task || 'Idle - Monitoring Channels';
+        if (kaggleUploadCountText) kaggleUploadCountText.textContent = status.total_uploaded_count || '0';
+
+        if (startKaggleBtn) {
+          startKaggleBtn.textContent = '🔄 Restart Engine';
+          startKaggleBtn.style.background = 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)';
+          startKaggleBtn.style.color = '#fff';
+        }
+        if (stopKaggleBtn) stopKaggleBtn.classList.remove('hidden');
+      } else if (isLaunching) {
+        kaggleStatusBadge.textContent = '🟡 Launching...';
+        kaggleStatusBadge.style.background = 'rgba(234, 179, 8, 0.2)';
+        kaggleStatusBadge.style.color = '#facc15';
+        kaggleStatusBadge.style.borderColor = '#eab308';
+        kaggleStatusSubtext.textContent = 'Kaggle cloud worker boot ho raha hai, please wait 30 seconds...';
+        if (kaggleActiveStrip) kaggleActiveStrip.classList.add('hidden');
+        if (stopKaggleBtn) stopKaggleBtn.classList.remove('hidden');
+      } else {
+        kaggleStatusBadge.textContent = '⚪ Offline';
+        kaggleStatusBadge.style.background = 'rgba(100, 116, 139, 0.25)';
+        kaggleStatusBadge.style.color = '#94a3b8';
+        kaggleStatusBadge.style.borderColor = '#475569';
+        kaggleStatusSubtext.textContent = 'Google Cloud multi-gigabit network se zero-bot block video download & upload. 11h 30m auto-renew loop ready.';
+        if (kaggleActiveStrip) kaggleActiveStrip.classList.add('hidden');
+
+        if (startKaggleBtn) {
+          startKaggleBtn.textContent = '🚀 Start 24/7 Engine';
+          startKaggleBtn.style.background = 'linear-gradient(135deg, #00C853 0%, #64DD17 100%)';
+          startKaggleBtn.style.color = '#000';
+        }
+        if (stopKaggleBtn) stopKaggleBtn.classList.add('hidden');
+      }
+    } catch (err) {
+      console.warn('Could not load Kaggle status:', err);
+    }
+  }
+
+  function setupKaggleListeners() {
+    if (openKaggleModalBtn) {
+      openKaggleModalBtn.addEventListener('click', () => {
+        if (kaggleConfigCache.kaggle_user) {
+          kaggleUserInput.value = kaggleConfigCache.kaggle_user;
+        }
+        if (kaggleConfigCache.auto_renew !== undefined) {
+          kaggleAutoRenewCheck.checked = kaggleConfigCache.auto_renew;
+        }
+        kaggleConfigModal.classList.remove('hidden');
+      });
+    }
+
+    if (closeKaggleModalBtn) closeKaggleModalBtn.addEventListener('click', () => kaggleConfigModal.classList.add('hidden'));
+    if (cancelKaggleModalBtn) cancelKaggleModalBtn.addEventListener('click', () => kaggleConfigModal.classList.add('hidden'));
+
+    if (kaggleConfigForm) {
+      kaggleConfigForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user = kaggleUserInput.value.trim();
+        const key = kaggleKeyInput.value.trim();
+        const autoRenew = kaggleAutoRenewCheck.checked;
+
+        if (!user || !key) {
+          showKaggleAlert('Kaggle Username aur API Key dono required hain!', 'error');
+          return;
+        }
+
+        const btnText = saveKaggleConfigBtn.querySelector('.btn-text');
+        const spinner = saveKaggleConfigBtn.querySelector('.spinner');
+        btnText.textContent = 'Launching Engine...';
+        spinner.classList.remove('hidden');
+        saveKaggleConfigBtn.disabled = true;
+
+        try {
+          const res = await fetch('/api/kaggle/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              kaggle_user: user,
+              kaggle_key: key,
+              auto_renew: autoRenew
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            kaggleConfigModal.classList.add('hidden');
+            loadKaggleStatus();
+          } else {
+            showKaggleAlert(data.message || 'Kaggle launch failed', 'error');
+          }
+        } catch (err) {
+          showKaggleAlert(err.message, 'error');
+        } finally {
+          btnText.textContent = '💾 Save & Launch Engine';
+          spinner.classList.add('hidden');
+          saveKaggleConfigBtn.disabled = false;
+        }
+      });
+    }
+
+    if (startKaggleBtn) {
+      startKaggleBtn.addEventListener('click', async () => {
+        if (!kaggleConfigCache.kaggle_user || !kaggleConfigCache.kaggle_key) {
+          if (openKaggleModalBtn) openKaggleModalBtn.click();
+          return;
+        }
+
+        startKaggleBtn.disabled = true;
+        startKaggleBtn.textContent = 'Starting...';
+        try {
+          const res = await fetch('/api/kaggle/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(kaggleConfigCache)
+          });
+          const data = await res.json();
+          if (data.success) {
+            loadKaggleStatus();
+          } else {
+            alert('Kaggle start error: ' + data.message);
+          }
+        } catch (err) {
+          alert('Network error starting Kaggle: ' + err.message);
+        } finally {
+          startKaggleBtn.disabled = false;
+        }
+      });
+    }
+
+    if (stopKaggleBtn) {
+      stopKaggleBtn.addEventListener('click', async () => {
+        if (!confirm('Kaggle 24/7 Engine stop karna chahte hain?')) return;
+        try {
+          await fetch('/api/kaggle/stop', { method: 'POST' });
+          loadKaggleStatus();
+        } catch (e) {
+          console.warn('Error stopping Kaggle:', e);
+        }
+      });
+    }
+
+    function showKaggleAlert(msg, type) {
+      kaggleAlert.textContent = msg;
+      kaggleAlert.className = `alert-box ${type}`;
+      kaggleAlert.classList.remove('hidden');
+    }
+
+    // Auto-refresh Kaggle status every 10 seconds
+    setInterval(loadKaggleStatus, 10000);
+    loadKaggleStatus();
+  }
+
+  // -----------------------------------------------------------
   // Kickstart Application
   // -----------------------------------------------------------
   initApp();
+  setupKaggleListeners();
 });

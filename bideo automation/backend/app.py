@@ -1,12 +1,14 @@
 import os
 import sys
 import json
+import time
+import uuid
 import subprocess
 import tempfile
 import threading
 from datetime import datetime
 import requests
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import imageio_ffmpeg
 
@@ -14,6 +16,7 @@ from firebase_client import FirebaseClient
 from bideo_client import BideoClient
 from youtube_worker import YouTubeWorker
 from automation_scheduler import AutomationScheduler
+from kaggle_manager import KaggleManager, FIREBASE_DB_URL, FIREBASE_ROOT
 
 if sys.platform == "win32":
     try:
@@ -345,6 +348,32 @@ def upload_single_url():
     token = account["token"]
     bideo_channel_name = account.get("name", "Bideo Channel")
 
+    # If Kaggle 24/7 Super-Engine is running, queue task for instant Google Cloud execution!
+    k_status = KaggleManager.get_status()
+    if k_status.get("is_running") and (time.time() - k_status.get("last_heartbeat", 0) < 180):
+        task_id = f"task_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        task_payload = {
+            "id": task_id,
+            "video_url": video_url,
+            "bideo_user_id": bideo_user_id,
+            "bideo_channel_name": bideo_channel_name,
+            "category_id": category_id,
+            "title": custom_title,
+            "description": custom_desc,
+            "status": "pending",
+            "created_at": datetime.now().isoformat()
+        }
+        try:
+            requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/single_upload_queue/{task_id}.json", json=task_payload, timeout=5)
+            return jsonify({
+                "success": True,
+                "message": "Task Kaggle 24/7 Cloud Super-Engine ko bhej diya gaya hai! Google Cloud network se superfast download & Bideo upload ho raha hai.",
+                "task_id": task_id,
+                "via": "kaggle_cloud"
+            })
+        except Exception as q_err:
+            print(f"[Queue Error] {q_err}. Falling back to local execution...")
+
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
             print(f"[Single Link Upload] Downloading {video_url} with <500MB safeguard...")
@@ -490,12 +519,117 @@ def upload_to_channel():
 
 
 # -------------------------------------------------------------
-# Start Background Automation Scheduler
+# API: Kaggle 24/7 Cloud Super-Engine Management
+# -------------------------------------------------------------
+@app.route("/api/kaggle/config", methods=["GET", "POST"])
+def kaggle_config():
+    if request.method == "POST":
+        data = request.get_json() or {}
+        KaggleManager.save_config(data)
+        return jsonify({"success": True, "message": "Kaggle configuration saved!"})
+    config = KaggleManager.get_config()
+    return jsonify({"success": True, "config": config})
+
+
+@app.route("/api/kaggle/status", methods=["GET"])
+def kaggle_status():
+    status = KaggleManager.get_status()
+    config = KaggleManager.get_config()
+    return jsonify({
+        "success": True,
+        "status": status,
+        "config": config
+    })
+
+
+@app.route("/api/kaggle/start", methods=["POST"])
+def kaggle_start():
+    data = request.get_json() or {}
+    config = KaggleManager.get_config()
+
+    user = data.get("kaggle_user") or config.get("kaggle_user")
+    key = data.get("kaggle_key") or config.get("kaggle_key")
+    slug = data.get("kaggle_slug") or config.get("kaggle_slug", "bideo-automation-engine")
+
+    if not user or not key:
+        return jsonify({"success": False, "message": "Kaggle Username aur API Key zaroori hai!"}), 400
+
+    config.update({"kaggle_user": user, "kaggle_key": key, "kaggle_slug": slug, "auto_renew": True})
+    KaggleManager.save_config(config)
+
+    ok, msg = KaggleManager.push_kernel(user, key, slug)
+    if ok:
+        try:
+            requests.put(
+                f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
+                json={
+                    "is_running": True,
+                    "state": "launching",
+                    "launched_at": datetime.now().isoformat(),
+                    "last_heartbeat": time.time(),
+                    "current_task": "Launching Kaggle Engine via API..."
+                },
+                timeout=5
+            )
+        except Exception:
+            pass
+        return jsonify({"success": True, "message": "Kaggle 24/7 Cloud Super-Engine start ho gaya!"})
+    else:
+        return jsonify({"success": False, "message": f"Kaggle API Error: {msg}"}), 500
+
+
+@app.route("/api/kaggle/stop", methods=["POST"])
+def kaggle_stop():
+    config = KaggleManager.get_config()
+    user = config.get("kaggle_user")
+    key = config.get("kaggle_key")
+    slug = config.get("kaggle_slug", "bideo-automation-engine")
+
+    config["auto_renew"] = False
+    KaggleManager.save_config(config)
+
+    if user and key:
+        KaggleManager.cancel_kernel(user, key, slug)
+
+    try:
+        requests.put(
+            f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
+            json={
+                "is_running": False,
+                "state": "stopped",
+                "current_task": "Engine Stopped by User",
+                "last_heartbeat": time.time()
+            },
+            timeout=5
+        )
+    except Exception:
+        pass
+
+    return jsonify({"success": True, "message": "Kaggle Engine stopped and 24/7 auto-renew paused."})
+
+
+@app.route("/api/kaggle/download_notebook", methods=["GET"])
+def kaggle_download_notebook():
+    nb = KaggleManager.compile_notebook_json()
+    return Response(
+        nb,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment;filename=bideo_automation_kaggle.ipynb"}
+    )
+
+
+# -------------------------------------------------------------
+# Start Background Automation Scheduler & Kaggle 24/7 Supervisor
 # -------------------------------------------------------------
 try:
     AutomationScheduler.start()
 except Exception as e:
     print(f"[Scheduler Startup Notice] {e}")
+
+try:
+    KaggleManager.start_supervisor()
+except Exception as e:
+    print(f"[Kaggle Supervisor Startup Notice] {e}")
 
 
 if __name__ == "__main__":

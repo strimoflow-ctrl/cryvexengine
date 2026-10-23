@@ -159,6 +159,54 @@
             </button>
           </div>
         </div>
+        
+        <!-- ========================================================
+             KAGGLE 24/7 CLOUD SUPER-ENGINE HERO CARD
+        ======================================================== -->
+        <div class="card glass-card kaggle-engine-card" style="margin-bottom: 24px; border: 1px solid rgba(32, 190, 255, 0.4); background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(20, 30, 60, 0.9) 100%);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, #20BEFF 0%, #0077B5 100%); display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 15px rgba(32, 190, 255, 0.35);">
+                ⚡
+              </div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #fff;">Kaggle 24/7 Cloud Super-Engine</h3>
+                  <span id="kaggleStatusBadge" class="status-badge" style="background: rgba(100, 116, 139, 0.25); color: #94a3b8; border: 1px solid #475569; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                    ⚪ Offline
+                  </span>
+                </div>
+                <p id="kaggleStatusSubtext" style="margin: 4px 0 0 0; font-size: 0.85rem; color: #94a3b8;">
+                  Google Cloud multi-gigabit network se zero-bot block video download & upload. 11h 30m auto-renew loop ready.
+                </p>
+              </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <button id="openKaggleModalBtn" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                ⚙️ Setup API Key
+              </button>
+              <button id="startKaggleBtn" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #00C853 0%, #64DD17 100%); border: none; color: #000; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                🚀 Start 24/7 Engine
+              </button>
+              <button id="stopKaggleBtn" class="btn btn-outline btn-sm hidden" style="color: #ef4444; border-color: #ef4444;">
+                ⏹ Stop Engine
+              </button>
+              <a href="/api/kaggle/download_notebook" class="btn btn-secondary btn-sm" title="Download standalone .ipynb for Kaggle">
+                📥 .ipynb
+              </a>
+            </div>
+          </div>
+
+          <!-- ACTIVE ENGINE STATS STRIP (VISIBLE WHEN RUNNING) -->
+          <div id="kaggleActiveStrip" class="kaggle-active-strip hidden" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.82rem;">
+            <div>⏱️ <strong style="color: #cbd5e1;">Uptime:</strong> <span id="kaggleUptimeText" style="color: #38bdf8; font-weight: 600;">0h 0m</span></div>
+            <div>🔄 <strong style="color: #cbd5e1;">Auto-Renew In:</strong> <span id="kaggleRenewInText" style="color: #4ade80; font-weight: 600;">11h 30m</span></div>
+            <div>⚡ <strong style="color: #cbd5e1;">Live Task:</strong> <span id="kaggleLiveTaskText" style="color: #fbbf24; font-weight: 600;">Idle - Monitoring Channels</span></div>
+            <div>🎉 <strong style="color: #cbd5e1;">Total Uploads:</strong> <span id="kaggleUploadCountText" style="color: #c084fc; font-weight: 600;">0</span></div>
+          </div>
+        </div>
 
         <div class="automation-two-col">
           
@@ -543,6 +591,57 @@
           <div class="modal-actions">
             <button type="submit" id="saveCookiesBtn" class="btn btn-primary btn-block">
               <span class="btn-text">💾 Save Cookies to Server</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </div>
+        </form>
+    <!-- ========================================================
+         MODAL: KAGGLE 24/7 ENGINE CONFIGURATION
+    ======================================================== -->
+    <div id="kaggleConfigModal" class="modal-overlay hidden">
+      <div class="modal-card glass-card" style="max-width: 500px;">
+        <div class="modal-header space-between">
+          <div class="flex-align-center">
+            <span class="badge-icon" style="background: linear-gradient(135deg, #20BEFF 0%, #0077B5 100%);">⚡</span>
+            <div>
+              <h3>Kaggle 24/7 Engine Setup</h3>
+              <p>Free Google Cloud compute & zero bot-block execution</p>
+            </div>
+          </div>
+          <button id="closeKaggleModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+
+        <div id="kaggleAlert" class="alert-box hidden"></div>
+
+        <div style="background: rgba(32, 190, 255, 0.08); border-left: 3px solid #20BEFF; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; color: #cbd5e1; margin-bottom: 16px;">
+          💡 <strong>Kaggle API Token Kaise Milega?</strong><br>
+          1. <a href="https://www.kaggle.com/settings" target="_blank" style="color: #38bdf8; text-decoration: underline;">Kaggle Settings</a> page par jayein.<br>
+          2. 'API' section me jakar <strong>'Create New Token'</strong> click karein.<br>
+          3. Downloaded <code>kaggle.json</code> file se Username aur Key copy karke yahan paste karein.
+        </div>
+
+        <form id="kaggleConfigForm">
+          <div class="form-group">
+            <label for="kaggleUserInput">Kaggle Username <span class="required">*</span></label>
+            <input type="text" id="kaggleUserInput" placeholder="e.g. cryvex" required>
+          </div>
+
+          <div class="form-group">
+            <label for="kaggleKeyInput">Kaggle API Key (Token) <span class="required">*</span></label>
+            <input type="password" id="kaggleKeyInput" placeholder="e.g. 8a3f89b0231..." required>
+          </div>
+
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 14px; margin-bottom: 20px;">
+            <input type="checkbox" id="kaggleAutoRenewCheck" checked style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="kaggleAutoRenewCheck" style="margin: 0; cursor: pointer; font-size: 0.88rem; color: #f1f5f9;">
+              <strong>24/7 Continuous Mode</strong> (Har 11h 30m me auto-cancel & restart)
+            </label>
+          </div>
+
+          <div class="modal-actions" style="display: flex; gap: 10px;">
+            <button type="button" id="cancelKaggleModalBtn" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            <button type="submit" id="saveKaggleConfigBtn" class="btn btn-primary" style="flex: 2;">
+              <span class="btn-text">💾 Save & Launch Engine</span>
               <span class="spinner hidden"></span>
             </button>
           </div>
