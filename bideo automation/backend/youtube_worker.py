@@ -1,16 +1,32 @@
 import os
 import re
+import shutil
 import subprocess
 import yt_dlp
 import imageio_ffmpeg
 
-FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+FFMPEG_EXE = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
+ffmpeg_dir = os.path.dirname(FFMPEG_EXE)
+if ffmpeg_dir and ffmpeg_dir not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
 
 class YouTubeWorker:
     """YouTube Channel Scraper and 1080p Video Downloader using yt-dlp and FFmpeg"""
 
-    @staticmethod
+    @classmethod
+    def get_cookie_file(cls):
+        """Locates saved YouTube cookies file if present and valid."""
+        for cand in [
+            os.path.join(os.path.dirname(__file__), "cookies.txt"),
+            os.path.join(os.getcwd(), "cookies.txt"),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt"),
+            os.path.expanduser("~/cookies.txt")
+        ]:
+            if os.path.exists(cand) and os.path.getsize(cand) > 10:
+                return cand
+        return None
+
     @staticmethod
     def normalize_channel_url(channel_input):
         """Converts @handle or plain name to full YouTube channel URL."""
@@ -40,13 +56,12 @@ class YouTubeWorker:
             "playlistend": max_results,
             "quiet": True,
             "ignoreerrors": True,
-            "no_warnings": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["ios", "android", "mweb"]
-                }
-            }
+            "no_warnings": True
         }
+
+        cookie_file = cls.get_cookie_file()
+        if cookie_file:
+            ydl_opts["cookiefile"] = cookie_file
 
         videos = []
         channel_name = channel_input
@@ -202,30 +217,22 @@ class YouTubeWorker:
         else:
             video_url = video_url_or_id
 
+        # Define output template for downloaded video files
         output_template = os.path.join(output_dir, "%(id)s.%(ext)s")
 
-        # Format selector: Prioritize 1080p under 450MB, then 720p under 450MB, then 480p
+        # Bulletproof Universal Format Selector: Prioritizes 1080p/720p with fallback to any available stream
         format_selector = (
-            "bestvideo[filesize<440M][height<=1080]+bestaudio[filesize<35M]/"
-            "bestvideo[filesize_approx<440M][height<=1080]+bestaudio/"
-            "bestvideo[filesize<440M][height<=720]+bestaudio/"
-            "bestvideo[filesize_approx<440M][height<=720]+bestaudio/"
-            "best[filesize<450M]/"
-            "best[height<=720]/"
-            "best[height<=480]/"
+            "bv*[height<=1080]+ba/"
+            "b[height<=1080]/"
+            "bv*[height<=720]+ba/"
+            "b[height<=720]/"
+            "bv*+ba/"
+            "b/"
             "best"
         )
 
         # Check for cookies file if provided
-        cookie_file = None
-        for cand in [
-            os.path.join(os.path.dirname(__file__), "cookies.txt"),
-            os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.path.expanduser("~"), "cookies.txt")
-        ]:
-            if os.path.exists(cand) and os.path.getsize(cand) > 0:
-                cookie_file = cand
-                break
+        cookie_file = cls.get_cookie_file()
 
         ydl_opts = {
             "format": format_selector,
@@ -234,30 +241,39 @@ class YouTubeWorker:
             "ffmpeg_location": FFMPEG_EXE,
             "quiet": True,
             "no_warnings": True,
-            "writethumbnail": True,
-            # Bypasses "Sign in to confirm you're not a bot" on Datacenter/Cloud IPs (Botkeep/VPS)
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["ios", "android", "mweb"]
-                }
-            },
-            "http_headers": {
-                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)",
-                "Accept-Language": "en-US,en;q=0.9"
-            }
+            "writethumbnail": True
         }
+
+        # If cookies are available, use them with standard web client (all formats available)
         if cookie_file:
+            print(f"[YouTube Worker] Using saved cookies from: {cookie_file}")
             ydl_opts["cookiefile"] = cookie_file
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                meta = ydl.extract_info(video_url, download=True)
-        except Exception as dl_err:
-            print(f"[YouTube Worker Warning] Primary format failed: {dl_err}. Retrying with universal mobile format...")
-            fallback_opts = dict(ydl_opts)
-            fallback_opts["format"] = "best[height<=1080]/best[height<=720]/best"
-            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
-                meta = ydl.extract_info(video_url, download=True)
+        meta = None
+        attempts = [
+            ("Primary 1080p stream", dict(ydl_opts)),
+            ("Universal stream fallback", {**ydl_opts, "format": "bestvideo+bestaudio/best"})
+        ]
+
+        if cookie_file:
+            no_cookie_opts = dict(ydl_opts)
+            no_cookie_opts.pop("cookiefile", None)
+            no_cookie_opts["format"] = "bestvideo+bestaudio/best"
+            attempts.append(("Fallback without cookies", no_cookie_opts))
+
+        last_err = None
+        for desc, opts in attempts:
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    meta = ydl.extract_info(video_url, download=True)
+                if meta:
+                    break
+            except Exception as err:
+                last_err = err
+                print(f"[YouTube Worker Warning] {desc} failed: {err}. Trying next fallback...")
+
+        if not meta:
+            raise RuntimeError(f"YouTube download failed for {video_url}: {last_err}")
 
         video_id = meta.get("id")
         title = meta.get("title", "Untitled Video")
