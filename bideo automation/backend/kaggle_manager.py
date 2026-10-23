@@ -167,11 +167,11 @@ class KaggleManager:
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=35)
             if resp.status_code == 200:
-                print(f"🚀 [Kaggle Manager] Kernel '{full_slug}' launched successfully!")
+                print(f"[Kaggle Manager] Kernel '{full_slug}' launched successfully!")
                 return True, "Kaggle Job Launched Successfully!"
             else:
                 err = resp.text
-                print(f"❌ [Kaggle Manager] Push failed ({resp.status_code}): {err}")
+                print(f"[Kaggle Manager] Push failed ({resp.status_code}): {err}")
                 return False, err
         except Exception as e:
             return False, str(e)
@@ -220,10 +220,10 @@ class KaggleManager:
                         should_renew = (not is_running) or (state == "renew_ready") or hb_dead
 
                         if should_renew:
-                            print("🔄 [Kaggle Supervisor] Session renewal triggered! Cancelling old session...")
+                            print("[Kaggle Supervisor] Session renewal triggered! Cancelling old session...")
                             cls.cancel_kernel(kaggle_user, kaggle_key, kaggle_slug)
                             time.sleep(8)
-                            print("🚀 [Kaggle Supervisor] Launching fresh 11.5-hour Kaggle session...")
+                            print("[Kaggle Supervisor] Launching fresh 11.5-hour Kaggle session...")
                             ok, msg = cls.push_kernel(kaggle_user, kaggle_key, kaggle_slug)
                             if ok:
                                 # Update status in Firebase

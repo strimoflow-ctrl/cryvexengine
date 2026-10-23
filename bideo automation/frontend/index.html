@@ -230,9 +230,14 @@
                 <label for="ytChannelInput">YouTube Channel URL or @Handle <span class="required">*</span></label>
                 <div class="input-wrapper">
                   <span class="input-icon">🔗</span>
-                  <input type="text" id="ytChannelInput" placeholder="e.g. @MrBeast or https://youtube.com/@channel" required>
+                  <input type="text" id="ytChannelInput" placeholder="e.g. @ansalonfarmertv or channel URL" required>
                 </div>
-                <p class="helper-text">Channel ka handle (@name) ya full URL paste karein.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                  <p class="helper-text" style="margin: 0;">Channel handle (@name) ya URL paste karein.</p>
+                  <button type="button" id="previewChannelBtn" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 4px 10px;">
+                    🔍 Preview Channel Videos
+                  </button>
+                </div>
               </div>
 
               <div class="form-group">
@@ -660,6 +665,50 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         MODAL: YOUTUBE CHANNEL VIDEO CATALOG EXPLORER
+    ======================================================== -->
+    <div id="channelVideosModal" class="modal-overlay hidden">
+      <div class="modal-card glass-card catalog-modal-card">
+        <div class="catalog-header-strip">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span class="yt-icon-chip">▶</span>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 id="catalogModalTitle" style="margin: 0; font-size: 1.2rem; color: #FFF;">Channel Videos</h3>
+                <a id="catalogModalYtLink" href="#" target="_blank" style="color: #FF4444; font-size: 0.82rem; text-decoration: underline;" title="Open on YouTube">🔗 Open Channel</a>
+              </div>
+              <div id="catalogModalSub" style="font-size: 0.82rem; color: #94A3B8; margin-top: 3px;">Scanning videos...</div>
+            </div>
+          </div>
+          <button id="closeCatalogModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+
+        <!-- STATS & FILTER BAR -->
+        <div class="catalog-filter-bar">
+          <div class="catalog-badges-row">
+            <span id="badgeTotalVids" class="catalog-badge total">Total: 0</span>
+            <span id="badgeUploadedVids" class="catalog-badge uploaded">🟢 Uploaded: 0</span>
+            <span id="badgePendingVids" class="catalog-badge pending">⏳ Pending: 0</span>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div class="catalog-filter-tabs">
+              <button class="filter-tab-btn active" data-filter="all">All</button>
+              <button class="filter-tab-btn" data-filter="pending">⏳ Pending</button>
+              <button class="filter-tab-btn" data-filter="uploaded">🟢 Uploaded</button>
+            </div>
+            <input type="text" id="catalogSearchInput" class="catalog-search-input" placeholder="Search videos...">
+          </div>
+        </div>
+
+        <!-- VIDEO CARDS GRID -->
+        <div id="catalogVideosGrid" class="channel-videos-grid">
+          <div class="empty-state">Loading videos from YouTube...</div>
+        </div>
       </div>
     </div>
 

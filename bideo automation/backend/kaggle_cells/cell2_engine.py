@@ -4,6 +4,8 @@ import re
 import sys
 import time
 import json
+import uuid
+import random
 import shutil
 import tempfile
 import subprocess
@@ -22,10 +24,15 @@ BIDEO_API_BASE = "https://bideo.in/api"
 MAX_RUNTIME_SECONDS = 11.5 * 3600
 START_TIME = time.time()
 
+# Unique session ID for this worker container (prevents duplicate runs)
+MY_SESSION_ID = f"sess_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+
 print("=" * 65)
 print("🚀 [Kaggle Bideo Engine] Starting 11.5-Hour Autonomous Mega Engine")
+print(f"🔑 Worker Session ID: {MY_SESSION_ID}")
 print(f"⏰ Session Started At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print(f"⏱️ Auto-Renew Cutoff: In 11 Hours 30 Minutes")
+print(f"⏳ Pacing Rule: Exactly 1 Video every 10 to 20 Minutes (Random Interval)")
 print("=" * 65)
 
 
@@ -67,6 +74,26 @@ def fb_delete(path):
         print(f"[Firebase Error] DELETE /{path}: {e}")
         return False
 
+# Register session lease in Firebase immediately
+fb_put("worker_lease", {
+    "active_session_id": MY_SESSION_ID,
+    "started_at": datetime.now().isoformat(),
+    "host": "Kaggle Cloud (Google Infrastructure)"
+})
+
+def check_worker_lease():
+    """Immediately stops container if a newer Kaggle session has been launched."""
+    try:
+        lease = fb_get("worker_lease")
+        if lease and isinstance(lease, dict):
+            active_id = lease.get("active_session_id")
+            if active_id and active_id != MY_SESSION_ID:
+                print(f"\n🛑 [Kaggle Engine] Session superseded by newer session '{active_id}'.")
+                print(f"🛑 Terminating old session ({MY_SESSION_ID}) immediately to prevent duplicate uploads!")
+                sys.exit(0)
+    except Exception as e:
+        print(f"[Lease Check Notice] {e}")
+
 total_uploaded_count = 0
 
 
@@ -74,6 +101,7 @@ total_uploaded_count = 0
 # HEARTBEAT & STATUS REPORTING
 # -------------------------------------------------------------
 def update_heartbeat(current_task="Idle - Monitoring channels & queue", is_busy=False):
+    check_worker_lease()
     elapsed = int(time.time() - START_TIME)
     remaining = max(0, int(MAX_RUNTIME_SECONDS - elapsed))
     
@@ -286,8 +314,8 @@ def upload_to_bideo(token, video_path, thumb_path, title, description, category_
                 "thumbnail": ("thumbnail.jpg", tf, "image/jpeg")
             }
             data = {
-                "title": title[:100],
-                "description": description[:5000],
+                "title": (title or "YouTube Video")[:100],
+                "description": (description or "")[:900],
                 "uploadType": upload_type,
                 "duration": str(meta.get("duration", 15.0)),
                 "width": str(meta.get("width", 1080)),
@@ -377,19 +405,63 @@ def process_single_upload_queue():
 
 
 # -------------------------------------------------------------
-# WORKER: PROCESS CHANNEL PAIRINGS
+# WORKER: PROCESS CHANNEL PAIRINGS (STRICT 10-20 MINUTE PACING)
 # -------------------------------------------------------------
+# Global tracking for persistently failing videos to avoid infinite download loops
+failed_upload_vids = {}
+
 def process_channel_pairings():
-    """Checks all active YouTube -> Bideo pairings and syncs unposted videos."""
+    """
+    Checks all active YouTube -> Bideo pairings and syncs unposted videos.
+    STRICT PACING GUARANTEE:
+    Posts EXACTLY 1 video every 10 to 20 minutes (randomized anti-spam delay).
+    Never blasts all videos at once!
+    """
+    check_worker_lease()
+
     pairings_data = fb_get("pairings") or {}
     if not pairings_data:
         return
 
+    # Check pacing schedule timer in Firebase
+    sched = fb_get("schedule_state") or {}
+    now = time.time()
+    next_post_at = sched.get("next_post_at", 0)
+    last_posted_at = sched.get("last_posted_at", 0)
+
+    # Initialize schedule if not present or expired long ago (> 45 mins)
+    if next_post_at == 0 or (now - next_post_at > 2700):
+        delay = random.randint(10, 20) * 60
+        if last_posted_at > 0 and (now - last_posted_at < delay):
+            next_post_at = last_posted_at + delay
+        else:
+            # First post after boot starts after 40 seconds initial settling
+            next_post_at = now + 40
+        sched = {
+            "last_posted_at": last_posted_at,
+            "next_post_at": next_post_at,
+            "interval_seconds": delay,
+            "interval_minutes": delay // 60
+        }
+        fb_put("schedule_state", sched)
+
+    # If it is not time to post yet, wait and display countdown in heartbeat!
+    if now < next_post_at:
+        wait_sec = int(next_post_at - now)
+        wait_m = wait_sec // 60
+        wait_s = wait_sec % 60
+        task_msg = f"⏳ Pacing Delay: Next post in {wait_m}m {wait_s}s (Random 10-20m Interval)"
+        update_heartbeat(task_msg, is_busy=False)
+        return
+
+    # It IS time to post! Find unposted videos across active pairings
     posted_videos = fb_get("posted_videos") or {}
     posted_ids = set(posted_videos.keys()) if isinstance(posted_videos, dict) else set()
 
     for p_id, pairing in list(pairings_data.items()):
-        if not isinstance(pairing, dict) or not pairing.get("active", True):
+        check_worker_lease()
+        is_active = pairing.get("is_active", pairing.get("active", True))
+        if not isinstance(pairing, dict) or not is_active:
             continue
 
         yt_input = pairing.get("yt_channel_input") or pairing.get("yt_channel_name")
@@ -404,14 +476,12 @@ def process_channel_pairings():
             continue
 
         token = account["token"]
-
-        # Fetch latest videos from channel via yt-dlp flat extraction
-        update_heartbeat(f"Scanning channel '{pairing.get('yt_channel_name', yt_input)}' for new videos")
-        channel_url = yt_input if yt_input.startswith("http") else (f"https://www.youtube.com/{yt_input}" if yt_input.startswith("@") else f"https://www.youtube.com/@{yt_input}")
+        channel_name = pairing.get("yt_channel_name") or "YouTube Channel"
+        channel_url = pairing.get("yt_channel_url") or pairing.get("yt_channel_input") or channel_name
 
         ydl_opts = {
             "extract_flat": True,
-            "playlistend": 20,
+            "playlistend": 30,
             "quiet": True,
             "ignoreerrors": True,
             "no_warnings": True
@@ -420,78 +490,130 @@ def process_channel_pairings():
             ydl_opts["cookiefile"] = "cookies.txt"
 
         entries = []
+        if channel_url.startswith("http"):
+            target_url = channel_url
+            if not target_url.endswith("/videos") and not target_url.endswith("/shorts"):
+                target_url = f"{target_url.rstrip('/')}/videos"
+        elif channel_url.startswith("@"):
+            target_url = f"https://www.youtube.com/{channel_url.replace(' ', '')}/videos"
+        else:
+            target_url = f"ytsearch30:{channel_url}"
+
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(f"{channel_url.rstrip('/')}/videos", download=False)
+                info = ydl.extract_info(target_url, download=False)
                 if info and "entries" in info:
                     entries = [e for e in info["entries"] if e and e.get("id")]
-        except Exception as e:
-            # Fallback to search
+        except Exception:
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(f"ytsearch10:{yt_input}", download=False)
+                    info = ydl.extract_info(f"ytsearch30:{channel_name}", download=False)
                     if info and "entries" in info:
                         entries = [e for e in info["entries"] if e and e.get("id")]
             except Exception:
                 pass
 
-        # Filter unposted videos
-        unposted = [e for e in entries if e.get("id") not in posted_ids]
+        # Filter unposted videos and claims
+        unposted = [e for e in entries if e.get("id") not in posted_ids and failed_upload_vids.get(e.get("id"), 0) < 2]
         if not unposted:
             continue
 
-        print(f"\n📺 [Channel Sync] Found {len(unposted)} unposted video(s) for '{pairing.get('yt_channel_name', yt_input)}'")
+        # SELECT EXACTLY ONE VIDEO TO POST!
+        target_entry = unposted[0]
+        vid_id = target_entry.get("id")
+        vid_url = f"https://www.youtube.com/watch?v={vid_id}"
+        vid_title = target_entry.get("title", "YouTube Video")
 
-        for entry in unposted:
-            vid_id = entry.get("id")
-            vid_url = f"https://www.youtube.com/watch?v={vid_id}"
-            vid_title = entry.get("title", "YouTube Video")
+        # Atomic Claim Check: prevent any other worker from touching this video
+        claim = fb_get(f"video_claims/{vid_id}")
+        if claim and isinstance(claim, dict):
+            claim_time = claim.get("claimed_at", 0)
+            if now - claim_time < 900:  # Claimed less than 15 mins ago
+                continue
 
-            print(f"📥 [Downloading Video] {vid_title} ({vid_id})...")
-            update_heartbeat(f"Syncing: {vid_title}", is_busy=True)
+        # Claim this video
+        fb_put(f"video_claims/{vid_id}", {
+            "claimed_by": MY_SESSION_ID,
+            "claimed_at": now,
+            "title": vid_title
+        })
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                try:
-                    dl = download_youtube_video(vid_url, tmp_dir)
-                    success, b_res, err = upload_to_bideo(
-                        token=token,
-                        video_path=dl["video_path"],
-                        thumb_path=dl["thumb_path"],
-                        title=dl["title"],
-                        description=dl["description"],
-                        category_id=category_id,
-                        is_short=dl["is_short"],
-                        meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]}
-                    )
+        print(f"\n📥 [Pacing Post Triggered] Uploading 1 video: '{vid_title}' ({vid_id})")
+        update_heartbeat(f"Syncing: {vid_title}", is_busy=True)
 
-                    if success:
-                        global total_uploaded_count
-                        total_uploaded_count += 1
-                        posted_ids.add(vid_id)
-                        # Save to posted_videos in Firebase
-                        fb_put(f"posted_videos/{vid_id}", {
-                            "yt_id": vid_id,
-                            "title": dl["title"],
-                            "bideo_user_id": bideo_user_id,
-                            "pairing_id": p_id,
-                            "posted_at": datetime.now().isoformat()
-                        })
-                        # Update pairing count
-                        current_count = pairing.get("published_count", 0) + 1
-                        pairing["published_count"] = current_count
-                        pairing["last_published_at"] = datetime.now().isoformat()
-                        fb_patch(f"pairings/{p_id}", {
-                            "published_count": current_count,
-                            "last_published_at": datetime.now().isoformat()
-                        })
-                        print(f"🎉 [Sync Success] '{dl['title']}' published to Bideo!")
-                    else:
-                        print(f"❌ [Sync Upload Failed] {err}")
-                except Exception as ex:
-                    print(f"❌ [Sync Error] {ex}")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            try:
+                check_worker_lease()
+                dl = download_youtube_video(vid_url, tmp_dir)
+                check_worker_lease()
 
-            # Brief pause between videos
-            time.sleep(3)
+                success, b_res, err = upload_to_bideo(
+                    token=token,
+                    video_path=dl["video_path"],
+                    thumb_path=dl["thumb_path"],
+                    title=dl["title"],
+                    description=dl["description"],
+                    category_id=category_id,
+                    is_short=dl["is_short"],
+                    meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]}
+                )
+
+                if success:
+                    global total_uploaded_count
+                    total_uploaded_count += 1
+                    posted_ids.add(vid_id)
+
+                    fb_put(f"posted_videos/{vid_id}", {
+                        "yt_id": vid_id,
+                        "title": dl["title"],
+                        "bideo_user_id": bideo_user_id,
+                        "pairing_id": p_id,
+                        "posted_at": datetime.now().isoformat()
+                    })
+
+                    current_count = pairing.get("published_count", 0) + 1
+                    pairing["published_count"] = current_count
+                    pairing["last_published_at"] = datetime.now().isoformat()
+                    fb_patch(f"pairings/{p_id}", {
+                        "published_count": current_count,
+                        "last_published_at": datetime.now().isoformat()
+                    })
+
+                    # Calculate NEXT DELAY (10 to 20 minutes)
+                    next_interval = random.randint(10, 20) * 60
+                    new_next_at = time.time() + next_interval
+                    fb_put("schedule_state", {
+                        "last_posted_at": time.time(),
+                        "last_posted_title": dl["title"],
+                        "next_post_at": new_next_at,
+                        "interval_seconds": next_interval,
+                        "interval_minutes": next_interval // 60
+                    })
+                    print(f"🎉 [Sync Success] '{dl['title']}' published to Bideo!")
+                    print(f"⏱️ [Next Post Scheduled] In {next_interval // 60} minutes ({next_interval}s)!")
+                    update_heartbeat(f"Post complete! Next upload in ~{next_interval // 60}m", is_busy=False)
+
+                    # EXIT FUNCTION IMMEDIATELY: DO NOT PROCESS ANY OTHER VIDEO IN THIS CYCLE!
+                    return
+
+                else:
+                    print(f"❌ [Sync Upload Failed] {err}")
+                    failed_upload_vids[vid_id] = failed_upload_vids.get(vid_id, 0) + 1
+                    fb_delete(f"video_claims/{vid_id}")
+
+            except Exception as ex:
+                print(f"❌ [Sync Error] {ex}")
+                failed_upload_vids[vid_id] = failed_upload_vids.get(vid_id, 0) + 1
+                fb_delete(f"video_claims/{vid_id}")
+
+        # If upload failed, retry after 2 minutes
+        fb_put("schedule_state", {
+            "last_posted_at": time.time(),
+            "next_post_at": time.time() + 120,
+            "interval_seconds": 120,
+            "interval_minutes": 2
+        })
+        return
 
 
 # -------------------------------------------------------------

@@ -536,13 +536,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="pairing-actions">
+            <button class="btn btn-secondary btn-sm explore-vids-btn" data-id="${p.id}" data-url="${p.yt_channel_url || ytName}" title="Browse all channel videos & upload status">
+              📂 View Videos
+            </button>
             <button class="btn btn-primary btn-sm sync-single-btn" data-id="${p.id}" title="Run download and upload now">
               ⚡ Sync Now
             </button>
             <button class="btn btn-secondary btn-sm toggle-btn" data-id="${p.id}" title="${isActive ? 'Pause' : 'Resume'}">
               ${isActive ? '🟢 Active' : '⏸️ Paused'}
             </button>
-            <button class="btn btn-secondary btn-sm delete-btn" data-id="${p.id}" style="color:#EF4444;" title="Delete">
+            <button class="btn btn-secondary btn-sm delete-btn" data-id="${p.id}" style="color:#EF4444;" title="Delete Channel">
               🗑️
             </button>
           </div>
@@ -555,6 +558,11 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
 
       // Event Listeners
+      const exploreBtn = card.querySelector('.explore-vids-btn');
+      exploreBtn.addEventListener('click', () => {
+        openChannelCatalog(p.yt_channel_url || p.yt_channel_name || ytName, p.id, p.bideo_user_id, p.category_id);
+      });
+
       const syncBtn = card.querySelector('.sync-single-btn');
       syncBtn.addEventListener('click', async () => {
         syncBtn.textContent = '⏳ Starting...';
@@ -580,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const deleteBtn = card.querySelector('.delete-btn');
       deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Kya aap YouTube channel '${ytName}' ki automation hatana chahte hain?`)) {
+        if (confirm(`Kya aap YouTube channel '${ytName}' ki automation hatana chahte hain? Delete karne par ye channel aage se sync nahi hoga.`)) {
           await fetch(`/api/pairings/${p.id}`, { method: 'DELETE' });
           loadPairings();
         }
@@ -640,6 +648,10 @@ document.addEventListener('DOMContentLoaded', () => {
           setTimeout(loadLogs, 3000);
           setTimeout(loadPairings, 6000);
         }).catch(() => {});
+
+        setTimeout(() => {
+          openChannelCatalog(data.pairing.yt_channel_url || data.pairing.yt_channel_name, data.pairing.id, data.pairing.bideo_user_id, data.pairing.category_id);
+        }, 500);
       }
 
     } catch (err) {
@@ -1269,6 +1281,218 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-refresh Kaggle status every 10 seconds
     setInterval(loadKaggleStatus, 10000);
     loadKaggleStatus();
+  // -----------------------------------------------------------
+  // YOUTUBE CHANNEL VIDEO CATALOG EXPLORER
+  // -----------------------------------------------------------
+  const channelVideosModal = document.getElementById('channelVideosModal');
+  const closeCatalogModalBtn = document.getElementById('closeCatalogModalBtn');
+  const catalogModalTitle = document.getElementById('catalogModalTitle');
+  const catalogModalYtLink = document.getElementById('catalogModalYtLink');
+  const catalogModalSub = document.getElementById('catalogModalSub');
+  const badgeTotalVids = document.getElementById('badgeTotalVids');
+  const badgeUploadedVids = document.getElementById('badgeUploadedVids');
+  const badgePendingVids = document.getElementById('badgePendingVids');
+  const catalogVideosGrid = document.getElementById('catalogVideosGrid');
+  const catalogSearchInput = document.getElementById('catalogSearchInput');
+  const previewChannelBtn = document.getElementById('previewChannelBtn');
+
+  let currentCatalogVideos = [];
+  let currentActiveFilter = 'all';
+  let currentSearchQuery = '';
+  let currentTargetBideoUserId = null;
+  let currentTargetCategoryId = null;
+
+  async function openChannelCatalog(channelUrl, pairingId = null, bideoUserId = null, categoryId = null) {
+    if (!channelUrl) return;
+
+    currentTargetBideoUserId = bideoUserId || (currentActiveAccount ? (currentActiveAccount._id || currentActiveAccount.id) : null);
+    currentTargetCategoryId = categoryId || (pairingCategorySelect ? pairingCategorySelect.value : '');
+
+    if (channelVideosModal) channelVideosModal.classList.remove('hidden');
+    catalogModalTitle.textContent = 'Loading Channel Videos...';
+    catalogModalSub.textContent = `Fetching videos from YouTube: ${channelUrl}...`;
+    catalogVideosGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+        <div class="spinner" style="margin: 0 auto 16px auto; width: 32px; height: 32px;"></div>
+        <p style="color: #94A3B8;">YouTube channel scan ho raha hai... Kripya thoda wait karein.</p>
+      </div>
+    `;
+
+    try {
+      const endpoint = pairingId
+        ? `/api/pairings/${pairingId}/videos`
+        : `/api/channel/videos?channel_url=${encodeURIComponent(channelUrl)}`;
+
+      const res = await fetch(endpoint);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Videos fetch karne me dikkat aayi.');
+      }
+
+      catalogModalTitle.textContent = data.channel_name || 'Channel Videos';
+      catalogModalYtLink.href = data.channel_url || `https://www.youtube.com/${channelUrl}`;
+      catalogModalSub.textContent = `Target Bideo Account: ${data.bideo_channel_name || (currentActiveAccount ? currentActiveAccount.name : 'Active Account')}`;
+
+      badgeTotalVids.textContent = `Total: ${data.total_videos}`;
+      badgeUploadedVids.textContent = `🟢 Uploaded: ${data.uploaded_count}`;
+      badgePendingVids.textContent = `⏳ Pending: ${data.pending_count}`;
+
+      currentCatalogVideos = data.videos || [];
+      renderCatalogVideos();
+
+    } catch (err) {
+      catalogVideosGrid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1; color: #EF4444;">
+          ❌ Channel load error: ${err.message}
+        </div>
+      `;
+    }
+  }
+
+  function renderCatalogVideos() {
+    let list = [...currentCatalogVideos];
+
+    if (currentActiveFilter === 'uploaded') {
+      list = list.filter(v => v.is_uploaded);
+    } else if (currentActiveFilter === 'pending') {
+      list = list.filter(v => !v.is_uploaded);
+    }
+
+    if (currentSearchQuery) {
+      const q = currentSearchQuery.toLowerCase();
+      list = list.filter(v => (v.title || '').toLowerCase().includes(q));
+    }
+
+    if (list.length === 0) {
+      catalogVideosGrid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          Koi video nahi mili is filter ke mutabiq.
+        </div>
+      `;
+      return;
+    }
+
+    catalogVideosGrid.innerHTML = '';
+    list.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'channel-video-card';
+
+      const thumbUrl = v.thumbnail || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`;
+      const durSec = Math.round(v.duration || 0);
+      const durStr = durSec > 0 ? `${Math.floor(durSec / 60)}:${String(durSec % 60).padStart(2, '0')}` : (v.is_short ? 'Shorts' : 'HD');
+      const isUp = !!v.is_uploaded;
+
+      card.innerHTML = `
+        <div class="channel-video-thumb-wrap">
+          <img src="${thumbUrl}" alt="${v.title}" loading="lazy" onerror="this.src='https://placehold.co/640x360/1a1a24/ffffff?text=Video';">
+          <span class="video-duration-pill">${durStr}</span>
+        </div>
+        <div class="channel-video-body">
+          <div class="channel-video-title" title="${v.title}">${v.title}</div>
+          <div class="channel-video-footer">
+            ${isUp 
+              ? `<span class="video-status-tag uploaded">🟢 Uploaded</span>`
+              : `<span class="video-status-tag pending">⏳ Pending</span>`
+            }
+            ${isUp
+              ? `<span style="color: #10B981; font-weight: 700; font-size: 0.8rem;">✅ Published</span>`
+              : `<button class="btn btn-primary btn-sm upload-now-single-btn" data-url="${v.url}" data-id="${v.id}">⚡ Upload Now</button>`
+            }
+          </div>
+        </div>
+      `;
+
+      if (!isUp) {
+        const upBtn = card.querySelector('.upload-now-single-btn');
+        upBtn.addEventListener('click', async () => {
+          upBtn.textContent = '⏳ Uploading...';
+          upBtn.disabled = true;
+
+          try {
+            const targetAccId = currentTargetBideoUserId || (currentActiveAccount ? (currentActiveAccount._id || currentActiveAccount.id) : null);
+            if (!targetAccId) {
+              alert('Kripya pehle ek Bideo channel select ya login karein!');
+              upBtn.textContent = '⚡ Upload Now';
+              upBtn.disabled = false;
+              return;
+            }
+
+            const res = await fetch('/api/upload_single_url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                video_url: v.url,
+                bideo_user_id: targetAccId,
+                category_id: currentTargetCategoryId || '',
+                title: v.title
+              })
+            });
+
+            const d = await res.json();
+            if (res.ok && d.success) {
+              v.is_uploaded = true;
+              alert(`🎉 '${v.title}' successfully Bideo par upload ho gaya!`);
+              // Update badges count
+              const upCount = currentCatalogVideos.filter(x => x.is_uploaded).length;
+              badgeUploadedVids.textContent = `🟢 Uploaded: ${upCount}`;
+              badgePendingVids.textContent = `⏳ Pending: ${currentCatalogVideos.length - upCount}`;
+              renderCatalogVideos();
+              loadPairings();
+              loadLogs();
+            } else {
+              alert(`Upload fail: ${d.message || 'Error uploading video'}`);
+              upBtn.textContent = '⚡ Upload Now';
+              upBtn.disabled = false;
+            }
+          } catch (err) {
+            alert(`Network error: ${err.message}`);
+            upBtn.textContent = '⚡ Upload Now';
+            upBtn.disabled = false;
+          }
+        });
+      }
+
+      catalogVideosGrid.appendChild(card);
+    });
+  }
+
+  // Filter Tabs Event Listeners
+  const filterBtns = document.querySelectorAll('.filter-tab-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentActiveFilter = btn.dataset.filter;
+      renderCatalogVideos();
+    });
+  });
+
+  // Search Filter
+  if (catalogSearchInput) {
+    catalogSearchInput.addEventListener('input', (e) => {
+      currentSearchQuery = e.target.value.trim();
+      renderCatalogVideos();
+    });
+  }
+
+  // Close Catalog Modal
+  if (closeCatalogModalBtn) {
+    closeCatalogModalBtn.addEventListener('click', () => {
+      channelVideosModal.classList.add('hidden');
+    });
+  }
+
+  // Preview Channel Videos Button in Connect Form
+  if (previewChannelBtn) {
+    previewChannelBtn.addEventListener('click', () => {
+      const input = ytChannelInput.value.trim();
+      if (!input) {
+        showPairingAlert('Kripya pehle YouTube Channel URL ya @Handle likhein!', 'error');
+        return;
+      }
+      openChannelCatalog(input);
+    });
   }
 
   // -----------------------------------------------------------

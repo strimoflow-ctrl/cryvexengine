@@ -90,6 +90,7 @@ class YouTubeWorker:
                                 "id": vid_id,
                                 "title": title,
                                 "url": url,
+                                "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                                 "duration": duration,
                                 "is_short": False
                             })
@@ -112,6 +113,7 @@ class YouTubeWorker:
                                     "id": vid_id,
                                     "title": e.get("title", "YouTube Short"),
                                     "url": f"https://www.youtube.com/shorts/{vid_id}",
+                                    "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                                     "duration": e.get("duration") or 30,
                                     "is_short": True
                                 })
@@ -169,6 +171,7 @@ class YouTubeWorker:
                                         "id": vid_id,
                                         "title": e.get("title", "YouTube Video"),
                                         "url": e.get("url") or f"https://www.youtube.com/watch?v={vid_id}",
+                                        "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                                         "duration": e.get("duration") or 0,
                                         "is_short": False
                                     })
@@ -185,6 +188,7 @@ class YouTubeWorker:
                                 "id": vid_id,
                                 "title": e.get("title", "YouTube Video"),
                                 "url": e.get("url") or f"https://www.youtube.com/watch?v={vid_id}",
+                                "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                                 "duration": e.get("duration") or 0,
                                 "is_short": False
                             })

@@ -281,6 +281,94 @@ def sync_all():
 
 
 # -------------------------------------------------------------
+# API: Channel Video Catalog Explorer (Live Check & Upload Status)
+# -------------------------------------------------------------
+@app.route("/api/channel/videos", methods=["GET"])
+def get_channel_videos():
+    channel_url = request.args.get("channel_url", "").strip()
+    if not channel_url:
+        return jsonify({"success": False, "message": "channel_url query parameter is required"}), 400
+
+    try:
+        channel_meta, raw_videos = YouTubeWorker.get_channel_info_and_videos(channel_url, max_results=50)
+        posted_videos = FirebaseClient.get_posted_videos()
+
+        enriched = []
+        for v in raw_videos:
+            vid_id = v.get("id")
+            is_uploaded = vid_id in posted_videos
+            post_info = posted_videos.get(vid_id) or {}
+            
+            entry = dict(v)
+            entry["is_uploaded"] = is_uploaded
+            entry["posted_at"] = post_info.get("posted_at") or post_info.get("postedAt")
+            entry["bideo_user_id"] = post_info.get("bideo_user_id")
+            entry["pairing_id"] = post_info.get("pairing_id")
+            enriched.append(entry)
+
+        uploaded_count = sum(1 for v in enriched if v.get("is_uploaded"))
+        pending_count = len(enriched) - uploaded_count
+
+        return jsonify({
+            "success": True,
+            "channel_name": channel_meta.get("channel_name", channel_url),
+            "channel_url": channel_meta.get("channel_url", channel_url),
+            "total_videos": len(enriched),
+            "uploaded_count": uploaded_count,
+            "pending_count": pending_count,
+            "videos": enriched
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Channel videos fetch failed: {str(e)}"}), 500
+
+
+@app.route("/api/pairings/<pairing_id>/videos", methods=["GET"])
+def get_pairing_videos(pairing_id):
+    pairings = FirebaseClient.get_pairings()
+    target = next((p for p in pairings if p.get("id") == pairing_id), None)
+    if not target:
+        return jsonify({"success": False, "message": "Pairing not found"}), 404
+
+    target_url = target.get("yt_channel_url") or target.get("yt_channel_name")
+    try:
+        channel_meta, raw_videos = YouTubeWorker.get_channel_info_and_videos(target_url, max_results=50)
+        posted_videos = FirebaseClient.get_posted_videos()
+
+        enriched = []
+        for v in raw_videos:
+            vid_id = v.get("id")
+            is_uploaded = vid_id in posted_videos
+            post_info = posted_videos.get(vid_id) or {}
+
+            entry = dict(v)
+            entry["is_uploaded"] = is_uploaded
+            entry["posted_at"] = post_info.get("posted_at") or post_info.get("postedAt")
+            entry["bideo_user_id"] = post_info.get("bideo_user_id")
+            entry["pairing_id"] = post_info.get("pairing_id")
+            enriched.append(entry)
+
+        uploaded_count = sum(1 for v in enriched if v.get("is_uploaded"))
+        pending_count = len(enriched) - uploaded_count
+
+        return jsonify({
+            "success": True,
+            "pairing_id": pairing_id,
+            "bideo_user_id": target.get("bideo_user_id"),
+            "bideo_channel_name": target.get("bideo_channel_name"),
+            "category_id": target.get("category_id"),
+            "channel_name": target.get("yt_channel_name") or channel_meta.get("channel_name"),
+            "channel_url": target.get("yt_channel_url") or channel_meta.get("channel_url"),
+            "total_videos": len(enriched),
+            "uploaded_count": uploaded_count,
+            "pending_count": pending_count,
+            "videos": enriched
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Pairing videos fetch failed: {str(e)}"}), 500
+
+
+
+# -------------------------------------------------------------
 # API: Save YouTube Cookies (For Cloud / Botkeep Bypass)
 # -------------------------------------------------------------
 @app.route("/api/save_cookies", methods=["POST"])
@@ -626,10 +714,14 @@ def kaggle_download_notebook():
 # -------------------------------------------------------------
 # Start Background Automation Scheduler & Kaggle 24/7 Supervisor
 # -------------------------------------------------------------
-try:
-    AutomationScheduler.start()
-except Exception as e:
-    print(f"[Scheduler Startup Notice] {e}")
+k_cfg = KaggleManager.get_config()
+if not k_cfg.get("kaggle_user") or not k_cfg.get("auto_renew", True):
+    try:
+        AutomationScheduler.start()
+    except Exception as e:
+        print(f"[Scheduler Startup Notice] {e}")
+else:
+    print("[Local Server] Kaggle 24/7 Cloud Super-Engine is active. Local scheduler disabled to prevent duplicate uploads.")
 
 try:
     KaggleManager.start_supervisor()

@@ -90,8 +90,8 @@ class BideoClient:
                 }
 
                 data = {
-                    "title": title[:100],  # Max title length safeguard
-                    "description": description[:5000],
+                    "title": (title or "YouTube Video")[:100],  # Max title length safeguard
+                    "description": (description or "")[:900],   # Bideo limit max 1000 chars safeguard
                     "uploadType": upload_type,
                     "duration": str(duration),
                     "width": str(width),

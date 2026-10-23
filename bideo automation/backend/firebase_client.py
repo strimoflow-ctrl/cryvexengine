@@ -137,6 +137,18 @@ class FirebaseClient:
             print(f"[Firebase Warning] mark_video_posted error: {e}")
             return False
 
+    @classmethod
+    def get_posted_videos(cls):
+        """Fetch all posted videos dictionary from Firebase."""
+        try:
+            r = requests.get(cls._url("posted_videos"), timeout=8)
+            data = r.json()
+            if isinstance(data, dict):
+                return data
+            return {}
+        except Exception:
+            return {}
+
     # -------------------------------------------------------------
     # Automation Activity Logs (STRICTLY LOCAL SERVER MEMORY - ZERO FIREBASE CHARGES)
     # -------------------------------------------------------------
