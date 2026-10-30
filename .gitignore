@@ -25,3 +25,8 @@ Thumbs.db
 *.zip
 kagglelogs/
 *.log
+
+kaggle logs/
+bots_backup.json
+
+kaggle logs

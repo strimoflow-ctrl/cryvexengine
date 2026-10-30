@@ -60,9 +60,9 @@ class AutonomousFarmEngine:
     Features:
     1. Hourly Bot Spawner:
        - Automatically spawns 1 new bot every 60 minutes.
-       - Max Cap: 150 Bots.
+       - Max Cap: 300 Bots.
        - Newly spawned bot immediately follows Cryvex channel.
-       - Once 150 bots reached, creation stops and all 150 bots operate in full rotation.
+       - Once 300 bots reached, creation stops and all 300 bots operate in full rotation.
 
     2. Anti-Rush & Organic View Pacing:
        - Strictly drip-feeds views one-by-one (2 to 5 minutes between Cryvex views).
@@ -99,12 +99,12 @@ class AutonomousFarmEngine:
         # Threads
         self.spawner_thread = None
         self.watchdog_thread = None
-        self.farming_thread = None
+        self.farming_threads = []
 
         # Configuration
         self.target_channel_id = DEFAULT_CRYVEX_CHANNEL_ID
         self.target_username = DEFAULT_CRYVEX_USERNAME
-        self.max_bots_limit = 150
+        self.max_bots_limit = 300
         self.bot_spawn_interval = 3600  # 1 hour
         self.review_check_interval = 1200  # 20 minutes
 
@@ -236,14 +236,18 @@ class AutonomousFarmEngine:
             self.state["is_active"] = True
             self.state["status_text"] = "24/7 Bull Farming Active (Anti-Rush Enabled)"
 
-            # Start Worker Threads
+            # Start Worker Threads (2 Balanced Farming Workers to maintain 17k-20k weekly views)
             self.spawner_thread = threading.Thread(target=self._spawner_loop, daemon=True)
             self.watchdog_thread = threading.Thread(target=self._watchdog_loop, daemon=True)
-            self.farming_thread = threading.Thread(target=self._farming_loop, daemon=True)
+            self.farming_threads = [
+                threading.Thread(target=self._farming_loop, args=(wid,), daemon=True)
+                for wid in range(1, 3)
+            ]
 
             self.spawner_thread.start()
             self.watchdog_thread.start()
-            self.farming_thread.start()
+            for t in self.farming_threads:
+                t.start()
 
             self._log("Engine Started", "24/7 Autonomous Farming Engine is now LIVE!", "success")
 
@@ -266,7 +270,7 @@ class AutonomousFarmEngine:
             return dict(self.state)
 
     # -------------------------------------------------------------
-    # WORKER 1: Hourly Bot Spawner (1 Bot/Hour, Max 150)
+    # WORKER 1: Hourly Bot Spawner (1 Bot/Hour, Max 300)
     # -------------------------------------------------------------
     def _spawner_loop(self):
         time.sleep(5)
@@ -277,7 +281,7 @@ class AutonomousFarmEngine:
                 self.state["total_bots"] = current_count
 
                 if current_count >= self.max_bots_limit:
-                    self.state["status_text"] = f"Max Cap Reached ({current_count}/150 Bots). Operating in full farming rotation."
+                    self.state["status_text"] = f"Max Cap Reached ({current_count}/{self.max_bots_limit} Bots). Operating in full farming rotation."
                     time.sleep(300)
                     continue
 
@@ -346,19 +350,21 @@ class AutonomousFarmEngine:
                 time.sleep(60)
 
     # -------------------------------------------------------------
-    # WORKER 3: Organic Human Farming & Stealth Rotation
+    # WORKER 3: Organic Human Farming & Stealth Rotation (Target: 17k-20k views/week)
     # -------------------------------------------------------------
-    def _farming_loop(self):
-        time.sleep(10)
+    def _farming_loop(self, worker_id=1):
+        # Stagger worker starts
+        time.sleep(worker_id * 8)
+        local_ratio_counter = 0
         while self.running:
             try:
-                # 80% Priority on Cryvex: 3 to 4 Cryvex views for every 1 Stealth browse
-                if self.cryvex_ratio_counter < 3 or random.random() < 0.75:
-                    delivered = self._execute_organic_cryvex_view()
+                # 85% Priority on Cryvex: ~5 Cryvex views for every 1 Stealth browse
+                if local_ratio_counter < 5 or random.random() < 0.85:
+                    delivered = self._execute_organic_cryvex_view(worker_id)
                     if delivered:
-                        self.cryvex_ratio_counter += 1
-                        # Human reading & watch gap (25s to 45s between views)
-                        delay = random.randint(25, 45)
+                        local_ratio_counter += 1
+                        # Organic human pacing (25s to 38s) maintains 17k-20k views/week
+                        delay = random.randint(25, 38)
                         self.state["next_cryvex_view_seconds"] = delay
                         time.sleep(delay)
                     else:
@@ -366,18 +372,18 @@ class AutonomousFarmEngine:
                 else:
                     # Occasional stealth browsing on public explore feed
                     self._execute_stealth_browsing()
-                    self.cryvex_ratio_counter = 0
-                    delay = random.randint(20, 35)
+                    local_ratio_counter = 0
+                    delay = random.randint(20, 32)
                     time.sleep(delay)
 
             except Exception as e:
-                self._log("Farming Loop Error", str(e), "error")
+                self._log(f"Farming Loop W{worker_id} Error", str(e), "error")
                 time.sleep(15)
 
     # -------------------------------------------------------------
     # Organic Cryvex Interaction (Smart Catalog Rotation)
     # -------------------------------------------------------------
-    def _execute_organic_cryvex_view(self):
+    def _execute_organic_cryvex_view(self, worker_id=1):
         bots = BotEngine.get_all_bots()
         active_bots = [b for b in bots if b.get("token")]
         if not active_bots:
@@ -389,10 +395,20 @@ class AutonomousFarmEngine:
         if not videos:
             return False
 
-        # Smart Catalog Rotation: Pick the video least recently viewed
+        # Smart Catalog Balancing:
+        # 60% chance: Pick from lower-viewed pool (least recently viewed among lower half)
+        # 40% chance: Natural rotation across entire catalog
         now = time.time()
-        videos.sort(key=lambda v: self.video_last_viewed.get(v.get("_id"), 0))
-        target_video = videos[0]
+        if random.random() < 0.60:
+            sorted_by_views = sorted(videos, key=lambda v: v.get("views", 0))
+            lower_pool = sorted_by_views[:max(1, len(sorted_by_views) // 2)]
+            lower_pool.sort(key=lambda v: self.video_last_viewed.get(v.get("_id"), 0))
+            target_video = lower_pool[0]
+        else:
+            videos.sort(key=lambda v: self.video_last_viewed.get(v.get("_id"), 0))
+            cand_pool = videos[:max(1, len(videos) // 2)]
+            target_video = random.choice(cand_pool)
+
         vid_id = target_video.get("_id")
         title = target_video.get("title", "Video")
         self.video_last_viewed[vid_id] = now
@@ -442,7 +458,7 @@ class AutonomousFarmEngine:
                 commented = True
                 action_summary += f" + Commented: \"{comment_text[:20]}...\""
 
-            self._log(f"🤖 Cryvex Interaction ({bot_name})", action_summary, "success")
+            self._log(f"🤖 Cryvex [W{worker_id}] ({bot_name})", action_summary, "success")
             return True
 
         except Exception as e:

@@ -911,8 +911,20 @@ def kaggle_download_notebook():
 print("[Local Server] Pure Localhost Studio Active. Automation runs on-demand per user selected batch.")
 
 
+def get_free_port(default_port=5050):
+    import socket
+    pref = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or default_port)
+    for p in [pref, 5050, 5000, 5055, 8080]:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("0.0.0.0", p))
+                return p
+            except OSError:
+                continue
+    return pref
+
 if __name__ == "__main__":
-    port = int(os.environ.get("SERVER_PORT") or os.environ.get("PORT") or 5000)
+    port = get_free_port()
     print("==================================================")
     print(">>> BIDEO MULTI-CHANNEL & YOUTUBE AUTOMATION ACTIVE")
     print(f">>> Dashboard URL: http://localhost:{port}")

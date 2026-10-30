@@ -114,7 +114,13 @@ class BideoClient:
                     timeout=300  # 5 min timeout for large file uploads
                 )
 
-                resp_data = r.json()
+                try:
+                    resp_data = r.json()
+                except Exception:
+                    if r.status_code == 413:
+                        return False, None, "File too large for Bideo server (HTTP 413 Payload Too Large)"
+                    return False, None, f"Server HTTP {r.status_code}: {r.text[:100]}"
+
                 if r.ok and resp_data.get("success", True):
                     return True, resp_data.get("data", resp_data), None
                 return False, None, resp_data.get("message", "Upload failed on Bideo server")

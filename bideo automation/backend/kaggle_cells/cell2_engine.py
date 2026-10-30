@@ -167,10 +167,11 @@ def extract_video_info(video_path):
     return {"duration": round(duration, 2), "width": width, "height": height, "is_short": is_short}
 
 
-def enforce_storage_safeguard(video_path, output_dir, max_mb=470):
+def enforce_storage_safeguard(video_path, output_dir, max_mb=85):
     """
-    STRICT STORAGE SAFEGUARD (< 500MB):
-    If file exceeds 470MB, dynamically compresses to 720p or 480p to fit under 500MB.
+    STRICT STORAGE & CLOUDFLARE SAFEGUARD (< 85MB):
+    Cloudflare has a strict 100MB limit. If file exceeds 85MB, compresses to 720p or 480p.
+    Uses unique filename per video based on video_id to avoid batch overwrites!
     """
     if not os.path.exists(video_path):
         return video_path
@@ -179,8 +180,10 @@ def enforce_storage_safeguard(video_path, output_dir, max_mb=470):
     if size_mb <= max_mb:
         return video_path
 
-    print(f"⚠️ [Storage Safeguard] Video is {size_mb:.1f}MB (> {max_mb}MB)! Compressing with FFmpeg...")
-    safe_path = os.path.join(output_dir, "compressed_safe.mp4")
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    safe_path = os.path.join(output_dir, f"{base_name}_safe.mp4")
+
+    print(f"⚠️ [Storage Safeguard] Video '{base_name}' is {size_mb:.1f}MB (> {max_mb}MB)! Compressing with FFmpeg...")
 
     # Step 1: Compress to 720p with CRF 28
     cmd = [
@@ -194,7 +197,7 @@ def enforce_storage_safeguard(video_path, output_dir, max_mb=470):
 
     if os.path.exists(safe_path) and (os.path.getsize(safe_path) / (1024 * 1024) > max_mb):
         # Step 2: Aggressive 480p compression if still over limit
-        low_path = os.path.join(output_dir, "compressed_low.mp4")
+        low_path = os.path.join(output_dir, f"{base_name}_low.mp4")
         cmd_low = [
             "ffmpeg", "-y", "-i", safe_path,
             "-vf", "scale='min(854,iw)':-2",
@@ -204,12 +207,21 @@ def enforce_storage_safeguard(video_path, output_dir, max_mb=470):
         ]
         subprocess.run(cmd_low, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if os.path.exists(low_path) and os.path.getsize(low_path) > 0:
-            os.remove(safe_path)
+            try:
+                os.remove(safe_path)
+            except Exception:
+                pass
             safe_path = low_path
 
     if os.path.exists(safe_path) and os.path.getsize(safe_path) > 0:
         new_mb = os.path.getsize(safe_path) / (1024 * 1024)
-        print(f"✅ [Storage Safeguard] Compressed down to {new_mb:.1f}MB (< 500MB)!")
+        print(f"✅ [Storage Safeguard] Compressed '{base_name}' down to {new_mb:.1f}MB (< 85MB)!")
+        # Free disk space by removing the original uncompressed video
+        try:
+            if os.path.abspath(video_path) != os.path.abspath(safe_path) and os.path.exists(video_path):
+                os.remove(video_path)
+        except Exception:
+            pass
         return safe_path
 
     return video_path
@@ -268,8 +280,8 @@ def download_youtube_video(video_url, output_dir):
                 downloaded_video = os.path.join(output_dir, f)
                 break
 
-    # Apply strict < 500MB safeguard
-    final_video_path = enforce_storage_safeguard(downloaded_video, output_dir, max_mb=470)
+    # Apply strict < 85MB safeguard (Cloudflare 100MB max limit)
+    final_video_path = enforce_storage_safeguard(downloaded_video, output_dir, max_mb=85)
 
     # Locate or generate thumbnail
     thumb_path = os.path.join(output_dir, f"{video_id}_thumb.jpg")
@@ -283,6 +295,11 @@ def download_youtube_video(video_url, output_dir):
     if native_thumb:
         cmd = ["ffmpeg", "-y", "-i", native_thumb, "-q:v", "2", thumb_path]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            if os.path.abspath(native_thumb) != os.path.abspath(thumb_path) and os.path.exists(native_thumb):
+                os.remove(native_thumb)
+        except Exception:
+            pass
 
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
         generate_thumbnail(final_video_path, thumb_path)
@@ -330,8 +347,14 @@ def upload_to_bideo(token, video_path, thumb_path, title, description, category_
             auth_header = f"Bearer {token}" if not token.startswith("Bearer ") else token
             headers = {"Authorization": auth_header}
 
-            r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=120)
-            res_json = r.json()
+            r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=180)
+            try:
+                res_json = r.json()
+            except Exception:
+                if r.status_code == 413:
+                    return False, None, "File too large for Bideo server (HTTP 413 Payload Too Large)"
+                return False, None, f"Server HTTP {r.status_code}: {r.text[:100]}"
+
             if r.ok and res_json.get("success"):
                 return True, res_json.get("data", res_json), None
             return False, None, res_json.get("message", "Upload failed")
