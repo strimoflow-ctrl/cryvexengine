@@ -277,6 +277,34 @@ class PodiumMinerEngine:
         with self.log_lock:
             self.logs.appendleft(entry)
 
+    def sync_podium_state(self):
+        """Pushes current coin balances and recent logs to Firebase."""
+        try:
+            payload = {
+                "last_updated": datetime.now().isoformat(),
+                "total_coins_podium": sum(a.coins for a in self.accounts),
+                "recent_logs": list(self.logs),
+                "accounts": [
+                    {
+                        "rank": a.rank,
+                        "label": a.label,
+                        "username": a.username,
+                        "phone": a.phone,
+                        "coins": round(a.coins, 1),
+                        "mined_this_run": round(a.session_coins_mined, 1),
+                        "watch_coins": round(a.watch_coins_mined, 1),
+                        "ad_coins": round(a.ad_coins_mined, 1),
+                        "ads_watched": a.ads_watched,
+                        "ads_remaining": a.ads_remaining,
+                        "status": a.status
+                    }
+                    for a in self.accounts
+                ]
+            }
+            requests.put(FIREBASE_PODIUM_URL, json=payload, timeout=6)
+        except Exception:
+            pass
+
     def start_in_background(self):
         """Starts engine asynchronously in background thread."""
         t = threading.Thread(target=self.start, daemon=True)
@@ -334,6 +362,7 @@ class PodiumMinerEngine:
                         now_str = datetime.now().strftime("%H:%M:%S")
                         print(f"{CLR_GOLD}[{now_str}] 🎁 [AD REWARD] {acc.label} ({acc.username}) Claimed +2.0 Coins ──► Balance: {acc.coins:.1f} Coins (Ads Left: {acc.ads_remaining}/16){CLR_RESET}")
                         self.add_log(f"🎁 AD REWARD [{acc.label}]", f"Claimed +2.0 Coins (Balance: {acc.coins:.1f} | Ads Left: {acc.ads_remaining}/16)", "coin-reward")
+                        self.sync_podium_state()
                         time.sleep(random.randint(8, 15))
                         continue
 
@@ -390,6 +419,7 @@ class PodiumMinerEngine:
                     now_str = datetime.now().strftime("%H:%M:%S")
                     print(f"{CLR_GREEN}[{now_str}] 🪙 [COIN MINED] {acc.label} [S{stream_id}] ({acc.username}) Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Total: {acc.coins:.1f}{CLR_RESET}")
                     self.add_log(f"🪙 COIN MINED [{acc.label}]", f"[Stream #{stream_id}] Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Vault: {acc.coins:.1f}", "coin-reward")
+                    self.sync_podium_state()
 
                 # Short realistic human gap between videos (3 to 7 seconds)
                 time.sleep(random.randint(3, 7))
@@ -413,6 +443,7 @@ class PodiumMinerEngine:
             else:
                 print(f"❌ Failed to login {acc.label} ({acc.phone})")
 
+        self.sync_podium_state()
         print("=" * 75)
 
         # 2. Launch Ad Claim workers (1 per account)
@@ -432,32 +463,7 @@ class PodiumMinerEngine:
         # 4. Main monitoring dashboard loop & Firebase live state sync
         try:
             while self.running:
-                # Sync live podium status to Firebase
-                try:
-                    payload = {
-                        "last_updated": datetime.now().isoformat(),
-                        "total_coins_podium": sum(a.coins for a in self.accounts),
-                        "recent_logs": list(self.logs),
-                        "accounts": [
-                            {
-                                "rank": a.rank,
-                                "label": a.label,
-                                "username": a.username,
-                                "phone": a.phone,
-                                "coins": round(a.coins, 1),
-                                "mined_this_run": round(a.session_coins_mined, 1),
-                                "watch_coins": round(a.watch_coins_mined, 1),
-                                "ad_coins": round(a.ad_coins_mined, 1),
-                                "ads_watched": a.ads_watched,
-                                "ads_remaining": a.ads_remaining,
-                                "status": a.status
-                            }
-                            for a in self.accounts
-                        ]
-                    }
-                    requests.put(FIREBASE_PODIUM_URL, json=payload, timeout=6)
-                except Exception:
-                    pass
+                self.sync_podium_state()
 
                 time.sleep(25)
                 now_str = datetime.now().strftime("%H:%M:%S")
