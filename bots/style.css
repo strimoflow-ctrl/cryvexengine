@@ -1257,6 +1257,7 @@ input[type="text"]:focus {
   .videos-grid {
     grid-template-columns: 1fr;
   }
+}
 .btn-warning {
   background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
   color: #111827;
@@ -1727,15 +1728,25 @@ body.cyber-theme {
 
 .podium-avatar {
   width: 46px;
+  min-width: 46px;
+  max-width: 46px;
   height: 46px;
+  min-height: 46px;
+  max-height: 46px;
   border-radius: 50%;
   border: 2px solid var(--neon-gold);
   object-fit: cover;
+  flex-shrink: 0;
+  display: block;
 }
 
 .podium-avatar-fallback {
   width: 46px;
+  min-width: 46px;
+  max-width: 46px;
   height: 46px;
+  min-height: 46px;
+  max-height: 46px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1743,6 +1754,7 @@ body.cyber-theme {
   font-family: var(--font-cyber);
   font-weight: 800;
   font-size: 15px;
+  flex-shrink: 0;
 }
 .avatar-cyan {
   background: rgba(0, 240, 255, 0.18);
