@@ -88,9 +88,10 @@ class BotEngine:
         return phone, username, password
 
     @classmethod
-    def create_single_bot(cls, custom_name=None, import_to_uploader=True):
+    def create_single_bot(cls, custom_name=None, import_to_uploader=False):
         """
         Creates a new verified Bideo account on the official server in 1 click (No OTP).
+        Preserved cleanly in Cloud Bot Army vault (isolated from local uploader).
         """
         phone, username, password = cls.generate_random_credentials()
         if custom_name:
@@ -164,7 +165,7 @@ class BotEngine:
             return False, None, f"Network error: {str(e)}"
 
     @classmethod
-    def bulk_create_bots(cls, count=5, import_to_uploader=True):
+    def bulk_create_bots(cls, count=5, import_to_uploader=False):
         """Create multiple bot accounts in batch."""
         results = []
         for _ in range(count):

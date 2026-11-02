@@ -175,7 +175,10 @@ class AutonomousFarmEngine:
                 self.state["recent_logs"] = self.state["recent_logs"][:50]
             self.state["current_action"] = f"[{now_str}] {title}: {message}"
 
-        print(f"[FARM ENGINE] [{now_str}] {title}: {message}")
+        # Colorful ANSI 256 Console Print
+        clr = "\033[1;38;5;82m" if category == "success" else ("\033[1;38;5;220m" if category == "coin" or "coin" in message.lower() else ("\033[1;38;5;141m" if category == "stealth" or "stealth" in title.lower() else ("\033[1;38;5;196m" if category == "error" else "\033[1;38;5;51m")))
+        clr_rst = "\033[0m"
+        print(f"{clr}[FARM ENGINE] [{now_str}] {title}: {message}{clr_rst}")
 
     def _load_farm_history(self):
         """Loads interaction history to prevent duplicate comments or likes."""
@@ -286,7 +289,7 @@ class AutonomousFarmEngine:
                     continue
 
                 self._log("Hourly Bot Spawner", f"Current Bots: {current_count}/{self.max_bots_limit}. Spawning 1 new bot...", "info")
-                ok, new_bot, err = BotEngine.create_single_bot(import_to_uploader=True)
+                ok, new_bot, err = BotEngine.create_single_bot(import_to_uploader=False)
 
                 if ok and new_bot:
                     bot_name = new_bot.get("name")

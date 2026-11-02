@@ -880,22 +880,119 @@ document.addEventListener('DOMContentLoaded', () => {
       if (farmStealthViews) farmStealthViews.textContent = st.stealth_views_today || 0;
       if (farmReviewsPassedVal) farmReviewsPassedVal.textContent = (st.reviews_passed_total || 0) + 13;
 
-      // Terminal logs rendering
+      // Terminal logs rendering with Cyber Filter & Glowing Coin detection
       if (farmTerminalLogs && Array.isArray(st.recent_logs)) {
-        if (st.recent_logs.length > 0) {
-          farmTerminalLogs.innerHTML = st.recent_logs.map(log => {
-            const catClass = log.category || 'info';
+        let filtered = st.recent_logs;
+        if (currentLogFilter === 'coin') {
+          filtered = st.recent_logs.filter(l => 
+            (l.title + ' ' + l.message).toLowerCase().includes('coin') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('reward') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('ad')
+          );
+        } else if (currentLogFilter === 'stream') {
+          filtered = st.recent_logs.filter(l => 
+            (l.title + ' ' + l.message).toLowerCase().includes('stream') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('watch')
+          );
+        } else if (currentLogFilter === 'bot') {
+          filtered = st.recent_logs.filter(l => 
+            (l.title + ' ' + l.message).toLowerCase().includes('cryvex') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('like') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('comment')
+          );
+        } else if (currentLogFilter === 'stealth') {
+          filtered = st.recent_logs.filter(l => 
+            (l.title + ' ' + l.message).toLowerCase().includes('stealth') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('browse') ||
+            (l.title + ' ' + l.message).toLowerCase().includes('public')
+          );
+        }
+
+        if (filtered.length > 0) {
+          farmTerminalLogs.innerHTML = filtered.map(log => {
+            const raw = (log.title + ' ' + log.message).toLowerCase();
+            let catClass = log.category || 'info';
+            if (raw.includes('coin') || raw.includes('reward earned') || raw.includes('+1.0') || raw.includes('+2.0')) {
+              catClass = 'coin-reward';
+            } else if (raw.includes('stealth')) {
+              catClass = 'stealth';
+            }
             return `<div class="term-line">
               <span class="term-time">[${log.time || 'NOW'}]</span>
               <span class="term-msg ${catClass}"><b>${log.title}:</b> ${log.message}</span>
             </div>`;
           }).join('');
+        } else if (st.recent_logs.length > 0) {
+          farmTerminalLogs.innerHTML = `<div class="term-line"><span class="term-time">[Filter]</span> <span class="term-msg text-dim">No logs matching filter '[${currentLogFilter.toUpperCase()}]' yet.</span></div>`;
         }
       }
 
     } catch (e) {
       console.warn('Failed to load farm status:', e);
     }
+  }
+
+  // Active Terminal Filter State
+  let currentLogFilter = 'all';
+  document.querySelectorAll('.term-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.term-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentLogFilter = btn.dataset.filter || 'all';
+      loadFarmStatus();
+    });
+  });
+
+  const clearTermBtn = document.getElementById('clearTermBtn');
+  if (clearTermBtn && farmTerminalLogs) {
+    clearTermBtn.addEventListener('click', () => {
+      farmTerminalLogs.innerHTML = `<div class="term-line"><span class="term-time">[System]</span> <span class="term-msg info">Terminal buffer cleared by user.</span></div>`;
+    });
+  }
+
+  // -------------------------------------------------------------
+  // Podium HUD Sync
+  // -------------------------------------------------------------
+  const podiumRank1Coins = document.getElementById('podiumRank1Coins');
+  const podiumRank2Coins = document.getElementById('podiumRank2Coins');
+  const podiumRank3Coins = document.getElementById('podiumRank3Coins');
+  const podiumRank1Ads = document.getElementById('podiumRank1Ads');
+  const podiumRank2Ads = document.getElementById('podiumRank2Ads');
+  const podiumRank3Ads = document.getElementById('podiumRank3Ads');
+  const refreshPodiumBtn = document.getElementById('refreshPodiumBtn');
+
+  async function loadPodiumStatus() {
+    try {
+      const res = await fetch('/api/podium/status');
+      const data = await res.json();
+      if (!data.success || !data.podium || !Array.isArray(data.podium.accounts)) return;
+
+      const accs = data.podium.accounts;
+      accs.forEach(acc => {
+        const coinsStr = Number(acc.coins || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        const adsStr = `${acc.ads_watched || 0}/16`;
+
+        if (acc.rank === 1) {
+          if (podiumRank1Coins) podiumRank1Coins.textContent = coinsStr;
+          if (podiumRank1Ads) podiumRank1Ads.textContent = adsStr;
+        } else if (acc.rank === 2) {
+          if (podiumRank2Coins) podiumRank2Coins.textContent = coinsStr;
+          if (podiumRank2Ads) podiumRank2Ads.textContent = adsStr;
+        } else if (acc.rank === 3) {
+          if (podiumRank3Coins) podiumRank3Coins.textContent = coinsStr;
+          if (podiumRank3Ads) podiumRank3Ads.textContent = adsStr;
+        }
+      });
+    } catch (e) {
+      // Quiet fail if miner hasn't written yet
+    }
+  }
+
+  if (refreshPodiumBtn) {
+    refreshPodiumBtn.addEventListener('click', () => {
+      loadPodiumStatus();
+      loadCryvexCoins();
+    });
   }
 
   if (farmToggleBtn) {
@@ -920,9 +1017,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start
   init();
   loadFarmStatus();
+  loadPodiumStatus();
 
   // 24/7 background live sync
   setInterval(loadCryvexCoins, 15000);
   setInterval(loadFarmStatus, 4000);
+  setInterval(loadPodiumStatus, 4000);
 });
 

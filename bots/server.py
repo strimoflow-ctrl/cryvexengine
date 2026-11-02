@@ -3,8 +3,9 @@ import sys
 import threading
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from bot_engine import BotEngine, AutoCoinMiner, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME
+from bot_engine import BotEngine, AutoCoinMiner, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE, DEFAULT_USER_AGENT
 from farming_engine import AutonomousFarmEngine
+import requests
 
 if sys.platform == "win32":
     try:
@@ -200,6 +201,22 @@ def search_channels():
 # -------------------------------------------------------------
 # 24/7 Autonomous Farming System API
 # -------------------------------------------------------------
+@app.route("/api/podium/status", methods=["GET"])
+def get_podium_status():
+    """Fetches live podium rankings from Firebase."""
+    try:
+        r = requests.get(
+            f"{BASE_NODE}/podium_miner.json",
+            headers={"User-Agent": DEFAULT_USER_AGENT},
+            timeout=5
+        )
+        if r.ok and r.json():
+            return jsonify({"success": True, "podium": r.json()})
+    except Exception:
+        pass
+    return jsonify({"success": False, "podium": None})
+
+
 @app.route("/api/farm/status", methods=["GET"])
 def get_farm_status():
     status = AutonomousFarmEngine.get_instance().get_status()

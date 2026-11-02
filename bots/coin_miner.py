@@ -35,6 +35,17 @@ if sys.platform == "win32":
 
 BIDEO_API_BASE = "https://bideo.in/api"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+FIREBASE_PODIUM_URL = "https://secret-gpt-default-rtdb.asia-southeast1.firebasedatabase.app/bideo_automation/podium_miner.json"
+
+# ANSI 256 Cyberpunk Console Colors
+CLR_GOLD = "\033[1;38;5;220m"
+CLR_GREEN = "\033[1;38;5;82m"
+CLR_CYAN = "\033[1;38;5;51m"
+CLR_PURPLE = "\033[1;38;5;141m"
+CLR_RED = "\033[1;38;5;196m"
+CLR_DIM = "\033[38;5;244m"
+CLR_BOLD = "\033[1m"
+CLR_RESET = "\033[0m"
 
 # ---------------------------------------------------------------------------
 # PODIUM ACCOUNTS CONFIGURATION
@@ -296,7 +307,7 @@ class PodiumMinerEngine:
                     claimed = acc.claim_ad_reward()
                     if claimed:
                         now_str = datetime.now().strftime("%H:%M:%S")
-                        print(f"[{now_str}] 🎁 {acc.label} ({acc.username}): Claimed Ad (+2 Coins) -> Total: {acc.coins:.1f}")
+                        print(f"{CLR_GOLD}[{now_str}] 🎁 [AD REWARD] {acc.label} ({acc.username}) Claimed +2.0 Coins ──► Balance: {acc.coins:.1f} Coins (Ads Left: {acc.ads_remaining}/16){CLR_RESET}")
                         time.sleep(random.randint(8, 15))
                         continue
 
@@ -351,7 +362,7 @@ class PodiumMinerEngine:
                 success, earned = acc.report_watch_time(target["id"], watch_duration)
                 if success and earned > 0:
                     now_str = datetime.now().strftime("%H:%M:%S")
-                    print(f"[{now_str}] 🪙 {acc.label} [S{stream_id}] ({acc.username}): Watched '{target['title'][:22]}...' ({watch_duration}s) -> +{earned} Coin (Total: {acc.coins:.1f})")
+                    print(f"{CLR_GREEN}[{now_str}] 🪙 [COIN MINED] {acc.label} [S{stream_id}] ({acc.username}) Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Total: {acc.coins:.1f}{CLR_RESET}")
 
                 # Short realistic human gap between videos (3 to 7 seconds)
                 time.sleep(random.randint(3, 7))
@@ -391,16 +402,43 @@ class PodiumMinerEngine:
         print("⚡ ALL MINING STREAMS ACTIVE & RUNNING 24/7!")
         print("=" * 75 + "\n")
 
-        # 4. Main monitoring dashboard loop
+        # 4. Main monitoring dashboard loop & Firebase live state sync
         try:
             while self.running:
-                time.sleep(30)
+                # Sync live podium status to Firebase
+                try:
+                    payload = {
+                        "last_updated": datetime.now().isoformat(),
+                        "total_coins_podium": sum(a.coins for a in self.accounts),
+                        "accounts": [
+                            {
+                                "rank": a.rank,
+                                "label": a.label,
+                                "username": a.username,
+                                "phone": a.phone,
+                                "coins": round(a.coins, 1),
+                                "mined_this_run": round(a.session_coins_mined, 1),
+                                "watch_coins": round(a.watch_coins_mined, 1),
+                                "ad_coins": round(a.ad_coins_mined, 1),
+                                "ads_watched": a.ads_watched,
+                                "ads_remaining": a.ads_remaining,
+                                "status": a.status
+                            }
+                            for a in self.accounts
+                        ]
+                    }
+                    requests.put(FIREBASE_PODIUM_URL, json=payload, timeout=6)
+                except Exception:
+                    pass
+
+                time.sleep(25)
                 now_str = datetime.now().strftime("%H:%M:%S")
-                print("\n" + "-" * 75)
-                print(f"📊 [PODIUM LIVE STATUS @ {now_str}]")
+                print("\n" + CLR_CYAN + "═" * 75 + CLR_RESET)
+                print(f"{CLR_BOLD}📊 [PODIUM LIVE STATUS @ {now_str}]{CLR_RESET}")
                 for acc in self.accounts:
-                    print(f"   {acc.label} ({acc.username}): Balance = {acc.coins:.1f} Coins | Mined This Run = +{acc.session_coins_mined:.1f} (Watch: {acc.watch_coins_mined:.0f}, Ads: {acc.ad_coins_mined:.0f}) | Ads Left: {acc.ads_remaining}/16")
-                print("-" * 75 + "\n")
+                    color = CLR_GOLD if acc.rank == 1 else (CLR_CYAN if acc.rank == 2 else CLR_PURPLE)
+                    print(f"   {color}{acc.label} ({acc.username}){CLR_RESET}: Balance = {CLR_BOLD}{acc.coins:.1f} Coins{CLR_RESET} | Mined = {CLR_GREEN}+{acc.session_coins_mined:.1f}{CLR_RESET} (Watch: {acc.watch_coins_mined:.0f}, Ads: {acc.ad_coins_mined:.0f}) | Ads Left: {acc.ads_remaining}/16")
+                print(CLR_CYAN + "═" * 75 + CLR_RESET + "\n")
         except KeyboardInterrupt:
             print("\n🛑 Stopping Podium Coin Miner cleanly...")
             self.running = False
