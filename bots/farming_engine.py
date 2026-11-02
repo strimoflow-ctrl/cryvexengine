@@ -6,7 +6,7 @@ import random
 import threading
 import requests
 from datetime import datetime
-from bot_engine import BotEngine, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE
+from bot_engine import BotEngine, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE, DEFAULT_USER_AGENT
 
 # Realistic human comments bank (Story, Cartoon, Animation, Entertainment)
 NATURAL_COMMENTS = [
@@ -421,7 +421,8 @@ class AutonomousFarmEngine:
 
         headers = {
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": DEFAULT_USER_AGENT
         }
 
         # Realistic watch-time between 25 and 55 seconds
@@ -477,7 +478,7 @@ class AutonomousFarmEngine:
 
         try:
             # Fetch public feed
-            r = requests.get("https://bideo.in/api/videos?limit=15", timeout=6)
+            r = requests.get("https://bideo.in/api/videos?limit=15", headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=8)
             if not r.ok:
                 return
             public_videos = r.json().get("data", [])
@@ -494,7 +495,11 @@ class AutonomousFarmEngine:
             token = bot["token"]
             bot_name = bot.get("name")
 
-            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "User-Agent": DEFAULT_USER_AGENT
+            }
             watch_seconds = random.randint(15, 35)
 
             # View & Watch time

@@ -320,46 +320,118 @@ def download_youtube_video(video_url, output_dir):
 
 
 # -------------------------------------------------------------
+# BIDEO AUTH & TOKEN MANAGEMENT
+# -------------------------------------------------------------
+def ensure_valid_token(bideo_user_id):
+    """
+    Fetches account from Firebase, verifies token validity, and auto-logs in 
+    with phone and password if token is expired or unauthorized.
+    """
+    account = fb_get(f"accounts/{bideo_user_id}")
+    if not account:
+        print(f"❌ Account '{bideo_user_id}' not found in Firebase!")
+        return None
+
+    token = account.get("token")
+    # Quick health check if token looks like a valid JWT
+    if token and token != "KILLED_SESSION" and len(token) > 30:
+        try:
+            r = requests.get(
+                f"{BIDEO_API_BASE}/auth/me",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=8
+            )
+            if r.status_code == 200 and r.json().get("success"):
+                return token
+        except Exception:
+            pass
+
+    # Token is missing, expired, or invalid -> Auto-relogin
+    phone = account.get("phone")
+    password = account.get("password")
+    if phone and password:
+        print(f"🔄 [Auto-Auth] Bideo token expired/invalid. Logging in with {phone}...")
+        try:
+            resp = requests.post(
+                f"{BIDEO_API_BASE}/auth/login",
+                json={"phone": phone, "password": password, "login": phone, "username": phone},
+                headers={"Content-Type": "application/json"},
+                timeout=20
+            )
+            data = resp.json()
+            if resp.ok and data.get("success"):
+                new_token = data.get("token")
+                print(f"✅ [Auto-Auth] Relogin successful! Fresh token saved to Firebase.")
+                fb_patch(f"accounts/{bideo_user_id}", {
+                    "token": new_token,
+                    "status": "active",
+                    "updated_at": datetime.now().isoformat()
+                })
+                return new_token
+            else:
+                print(f"❌ [Auto-Auth] Login failed: {data.get('message')}")
+        except Exception as e:
+            print(f"❌ [Auto-Auth] Login request error: {e}")
+
+    return token
+
+
+# -------------------------------------------------------------
 # BIDEO PUBLISHER
 # -------------------------------------------------------------
-def upload_to_bideo(token, video_path, thumb_path, title, description, category_id, is_short, meta):
-    """Uploads video directly to Bideo API."""
+def upload_to_bideo(token, video_path, thumb_path, title, description, category_id, is_short, meta, bideo_user_id=None):
+    """Uploads video directly to Bideo API with auto-retry on auth failure."""
     upload_type = "short" if is_short else "video"
 
-    try:
-        with open(video_path, "rb") as vf, open(thumb_path, "rb") as tf:
-            files = {
-                "video": (os.path.basename(video_path), vf, "video/mp4"),
-                "thumbnail": ("thumbnail.jpg", tf, "image/jpeg")
-            }
-            data = {
-                "title": (title or "YouTube Video")[:100],
-                "description": (description or "")[:900],
-                "uploadType": upload_type,
-                "duration": str(meta.get("duration", 15.0)),
-                "width": str(meta.get("width", 1080)),
-                "height": str(meta.get("height", 1920)),
-                "visibility": "public"
-            }
-            if category_id:
-                data["category"] = category_id
+    for attempt in range(2):
+        try:
+            with open(video_path, "rb") as vf, open(thumb_path, "rb") as tf:
+                files = {
+                    "video": (os.path.basename(video_path), vf, "video/mp4"),
+                    "thumbnail": ("thumbnail.jpg", tf, "image/jpeg")
+                }
+                data = {
+                    "title": (title or "YouTube Video")[:100],
+                    "description": (description or "")[:900],
+                    "uploadType": upload_type,
+                    "duration": str(meta.get("duration", 15.0)),
+                    "width": str(meta.get("width", 1080)),
+                    "height": str(meta.get("height", 1920)),
+                    "visibility": "public"
+                }
+                if category_id:
+                    data["category"] = category_id
 
-            auth_header = f"Bearer {token}" if not token.startswith("Bearer ") else token
-            headers = {"Authorization": auth_header}
+                auth_header = f"Bearer {token}" if not token.startswith("Bearer ") else token
+                headers = {"Authorization": auth_header}
 
-            r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=180)
-            try:
-                res_json = r.json()
-            except Exception:
-                if r.status_code == 413:
-                    return False, None, "File too large for Bideo server (HTTP 413 Payload Too Large)"
-                return False, None, f"Server HTTP {r.status_code}: {r.text[:100]}"
+                r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=180)
+                try:
+                    res_json = r.json()
+                except Exception:
+                    if r.status_code == 413:
+                        return False, None, "File too large for Bideo server (HTTP 413 Payload Too Large)"
+                    return False, None, f"Server HTTP {r.status_code}: {r.text[:100]}"
 
-            if r.ok and res_json.get("success"):
-                return True, res_json.get("data", res_json), None
-            return False, None, res_json.get("message", "Upload failed")
-    except Exception as e:
-        return False, None, str(e)
+                if r.ok and res_json.get("success"):
+                    return True, res_json.get("data", res_json), None
+
+                err_msg = res_json.get("message", "Upload failed")
+                # If unauthorized and user_id is provided, auto-refresh token and retry once
+                if attempt == 0 and ("authorized" in err_msg.lower() or r.status_code in (401, 403)) and bideo_user_id:
+                    print(f"⚠️ [Auth Error on Upload] {err_msg}. Refreshing token and retrying...")
+                    fresh_tok = ensure_valid_token(bideo_user_id)
+                    if fresh_tok and fresh_tok != token:
+                        token = fresh_tok
+                        continue
+
+                return False, None, err_msg
+        except Exception as e:
+            if attempt == 0 and bideo_user_id:
+                continue
+            return False, None, str(e)
+
+    return False, None, "Upload failed after retry"
 
 
 # -------------------------------------------------------------
@@ -385,13 +457,11 @@ def process_single_upload_queue():
         update_heartbeat(f"Single Upload: {video_url}", is_busy=True)
         fb_patch(f"single_upload_queue/{item_id}", {"status": "processing", "started_at": datetime.now().isoformat()})
 
-        # Fetch Bideo account token
-        account = fb_get(f"accounts/{bideo_user_id}")
-        if not account or not account.get("token"):
+        # Fetch & ensure fresh Bideo account token
+        token = ensure_valid_token(bideo_user_id)
+        if not token:
             fb_patch(f"single_upload_queue/{item_id}", {"status": "failed", "error": "Bideo account not logged in"})
             continue
-
-        token = account["token"]
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             try:
@@ -407,7 +477,8 @@ def process_single_upload_queue():
                     description=final_desc,
                     category_id=category_id,
                     is_short=dl["is_short"],
-                    meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]}
+                    meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]},
+                    bideo_user_id=bideo_user_id
                 )
 
                 if success:
@@ -572,6 +643,7 @@ def process_channel_pairings():
                 dl = download_youtube_video(vid_url, tmp_dir)
                 check_worker_lease()
 
+                token = ensure_valid_token(bideo_user_id) or token
                 success, b_res, err = upload_to_bideo(
                     token=token,
                     video_path=dl["video_path"],
@@ -580,7 +652,8 @@ def process_channel_pairings():
                     description=dl["description"],
                     category_id=category_id,
                     is_short=dl["is_short"],
-                    meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]}
+                    meta={"duration": dl["duration"], "width": dl["width"], "height": dl["height"]},
+                    bideo_user_id=bideo_user_id
                 )
 
                 if success:
@@ -746,9 +819,13 @@ def process_active_batch():
         title = item["title"]
         desc = item["description"]
         
+        # Always ensure fresh token before attempting upload
+        token = ensure_valid_token(bideo_user_id) or token
+
         update_heartbeat(f"📤 Uploading [{idx + 1}/{total_downloaded}]: '{title}'", is_busy=True)
         print(f"\n📤 [Batch Uploading {idx + 1}/{total_downloaded}] '{title}' to Bideo...")
         
+        is_success = False
         try:
             success, b_res, err = upload_to_bideo(
                 token=token,
@@ -758,10 +835,12 @@ def process_active_batch():
                 description=desc,
                 category_id=category_id,
                 is_short=item["is_short"],
-                meta={"duration": item["duration"], "width": item["width"], "height": item["height"]}
+                meta={"duration": item["duration"], "width": item["width"], "height": item["height"]},
+                bideo_user_id=bideo_user_id
             )
             
             if success:
+                is_success = True
                 total_uploaded_count += 1
                 b_vid_id = b_res.get("_id") or b_res.get("id") or "uploaded"
                 now_iso = datetime.now().isoformat()
@@ -797,17 +876,18 @@ def process_active_batch():
         except Exception as up_err:
             print(f"❌ [Upload Exception] '{title}': {up_err}")
             
-        # Clean up local file to free disk space
-        try:
-            if os.path.exists(item["video_path"]):
-                os.remove(item["video_path"])
-            if os.path.exists(item["thumb_path"]):
-                os.remove(item["thumb_path"])
-        except Exception:
-            pass
+        # Clean up local file to free disk space if successfully uploaded
+        if is_success:
+            try:
+                if os.path.exists(item["video_path"]):
+                    os.remove(item["video_path"])
+                if os.path.exists(item["thumb_path"]):
+                    os.remove(item["thumb_path"])
+            except Exception:
+                pass
             
-        # If more videos remain, sleep the pacing interval with live countdown
-        if idx < total_downloaded - 1:
+        # If successfully uploaded and more videos remain, sleep the pacing interval
+        if is_success and idx < total_downloaded - 1:
             jitter = random.randint(-180, 180) if base_interval > 600 else 0
             wait_time = max(120, base_interval + jitter)
             wait_min = wait_time // 60

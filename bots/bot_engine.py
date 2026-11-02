@@ -17,6 +17,8 @@ if sys.platform == "win32":
         pass
 
 BIDEO_API_BASE = "https://bideo.in/api"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+DEFAULT_HEADERS = {"User-Agent": DEFAULT_USER_AGENT}
 FIREBASE_DB_URL = os.environ.get(
     "FIREBASE_DB_URL",
     "https://secret-gpt-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -103,7 +105,8 @@ class BotEngine:
         }
 
         try:
-            r = requests.post(f"{BIDEO_API_BASE}/auth/signup", json=payload, timeout=12)
+            signup_headers = {"User-Agent": DEFAULT_USER_AGENT, "Content-Type": "application/json"}
+            r = requests.post(f"{BIDEO_API_BASE}/auth/signup", json=payload, headers=signup_headers, timeout=12)
             data = r.json()
 
             if not r.ok or not data.get("success"):
@@ -202,7 +205,7 @@ class BotEngine:
     @classmethod
     def search_channels(cls, query, sample_token=None):
         """Search Bideo channels by name or handle."""
-        headers = {}
+        headers = {"User-Agent": DEFAULT_USER_AGENT}
         if sample_token:
             headers["Authorization"] = f"Bearer {sample_token}"
         else:
@@ -267,7 +270,7 @@ class BotEngine:
         url = f"{BIDEO_API_BASE}/videos?owner={target_id}"
 
         try:
-            r = requests.get(url, timeout=10)
+            r = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
             if r.ok:
                 data = r.json().get("data", [])
 
@@ -278,7 +281,7 @@ class BotEngine:
                     try:
                         r_mon = requests.get(
                             f"{BIDEO_API_BASE}/users/monetization/status",
-                            headers={"Authorization": f"Bearer {cryvex_token}"},
+                            headers={"Authorization": f"Bearer {cryvex_token}", "User-Agent": DEFAULT_USER_AGENT},
                             timeout=6
                         )
                         if r_mon.ok:
@@ -498,7 +501,8 @@ class BotEngine:
         """Sends follow request from a single bot."""
         headers = {
             "Authorization": f"Bearer {bot_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": DEFAULT_USER_AGENT
         }
         url = f"{BIDEO_API_BASE}/followers/{target_channel_id}"
 
