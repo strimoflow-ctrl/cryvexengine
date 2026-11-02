@@ -21,6 +21,7 @@ import time
 import random
 import threading
 from datetime import datetime
+from collections import deque
 import requests
 
 import functools
@@ -251,12 +252,36 @@ class AccountSession:
 
 
 class PodiumMinerEngine:
+    _instance = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
     def __init__(self):
         self.accounts = [AccountSession(cfg) for cfg in PODIUM_CONFIG]
         self.running = False
         self.video_catalog = []
         self.catalog_lock = threading.Lock()
         self.last_catalog_refresh = 0
+        self.logs = deque(maxlen=40)
+        self.log_lock = threading.Lock()
+
+    def add_log(self, title, message, category="info"):
+        now_str = datetime.now().strftime("%H:%M:%S")
+        entry = {"time": now_str, "title": title, "message": message, "category": category}
+        with self.log_lock:
+            self.logs.appendleft(entry)
+
+    def start_in_background(self):
+        """Starts engine asynchronously in background thread."""
+        t = threading.Thread(target=self.start, daemon=True)
+        t.start()
+        return t
 
     def refresh_public_videos(self):
         """Fetches fresh list of public non-self videos from feed."""
@@ -308,6 +333,7 @@ class PodiumMinerEngine:
                     if claimed:
                         now_str = datetime.now().strftime("%H:%M:%S")
                         print(f"{CLR_GOLD}[{now_str}] 🎁 [AD REWARD] {acc.label} ({acc.username}) Claimed +2.0 Coins ──► Balance: {acc.coins:.1f} Coins (Ads Left: {acc.ads_remaining}/16){CLR_RESET}")
+                        self.add_log(f"🎁 AD REWARD [{acc.label}]", f"Claimed +2.0 Coins (Balance: {acc.coins:.1f} | Ads Left: {acc.ads_remaining}/16)", "coin-reward")
                         time.sleep(random.randint(8, 15))
                         continue
 
@@ -363,6 +389,7 @@ class PodiumMinerEngine:
                 if success and earned > 0:
                     now_str = datetime.now().strftime("%H:%M:%S")
                     print(f"{CLR_GREEN}[{now_str}] 🪙 [COIN MINED] {acc.label} [S{stream_id}] ({acc.username}) Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Total: {acc.coins:.1f}{CLR_RESET}")
+                    self.add_log(f"🪙 COIN MINED [{acc.label}]", f"[Stream #{stream_id}] Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Vault: {acc.coins:.1f}", "coin-reward")
 
                 # Short realistic human gap between videos (3 to 7 seconds)
                 time.sleep(random.randint(3, 7))
@@ -410,6 +437,7 @@ class PodiumMinerEngine:
                     payload = {
                         "last_updated": datetime.now().isoformat(),
                         "total_coins_podium": sum(a.coins for a in self.accounts),
+                        "recent_logs": list(self.logs),
                         "accounts": [
                             {
                                 "rank": a.rank,

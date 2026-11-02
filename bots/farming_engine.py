@@ -112,6 +112,7 @@ class AutonomousFarmEngine:
         self.cryvex_ratio_counter = 0
         self.video_last_viewed = {}  # vid_id -> timestamp
         self.last_cryvex_view_time = 0
+        self.next_cryvex_view_delay = 180
 
         # Engagement probabilities
         self.cryvex_like_chance = 0.50
@@ -267,8 +268,9 @@ class AutonomousFarmEngine:
         with self.lock:
             # Update countdowns
             now = time.time()
-            elapsed_cryvex = now - self.last_cryvex_view_time
-            remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+            elapsed_cryvex = now - getattr(self, "last_cryvex_view_time", 0)
+            delay = getattr(self, "next_cryvex_view_delay", 180)
+            remaining_cryvex = max(0, int(delay - elapsed_cryvex))
             self.state["next_cryvex_view_seconds"] = remaining_cryvex
             return dict(self.state)
 

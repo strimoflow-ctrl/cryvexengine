@@ -1,143 +1,243 @@
-[Botkeep] Checking Python dependencies; reuse requires a successful unchanged installation.
-Collecting Flask>=3.0.0 (from -r requirements.txt (line 1))
-  Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
-Collecting flask-cors>=4.0.0 (from -r requirements.txt (line 2))
-  Downloading flask_cors-6.0.5-py3-none-any.whl.metadata (5.4 kB)
-Collecting requests>=2.31.0 (from -r requirements.txt (line 3))
-  Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
-Collecting pillow>=10.0.0 (from -r requirements.txt (line 4))
-  Downloading pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
-Collecting imageio-ffmpeg>=0.5.0 (from -r requirements.txt (line 5))
-  Downloading imageio_ffmpeg-0.7.0-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
-Collecting yt-dlp>=2024.0.0 (from -r requirements.txt (line 6))
-  Downloading yt_dlp-2026.10.26-py3-none-any.whl.metadata (183 kB)
-Collecting gunicorn>=21.2.0 (from -r requirements.txt (line 7))
-  Downloading gunicorn-26.2.0-py3-none-any.whl.metadata (5.5 kB)
-Collecting blinker>=1.9.0 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
-Collecting click>=8.1.3 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
-Collecting itsdangerous>=2.2.0 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
-Collecting jinja2>=3.1.2 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
-Collecting markupsafe>=2.1.1 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading markupsafe-3.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
-Collecting werkzeug>=3.1.0 (from Flask>=3.0.0->-r requirements.txt (line 1))
-  Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
-Collecting charset_normalizer<4,>=2 (from requests>=2.31.0->-r requirements.txt (line 3))
-  Downloading charset_normalizer-3.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
-Collecting idna<4,>=2.5 (from requests>=2.31.0->-r requirements.txt (line 3))
-  Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
-Collecting urllib3<3,>=1.26 (from requests>=2.31.0->-r requirements.txt (line 3))
-  Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
-Collecting certifi>=2023.5.7 (from requests>=2.31.0->-r requirements.txt (line 3))
-  Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
-Downloading flask-3.1.3-py3-none-any.whl (103 kB)
-Downloading flask_cors-6.0.5-py3-none-any.whl (16 kB)
-Downloading requests-2.34.2-py3-none-any.whl (73 kB)
-Downloading charset_normalizer-3.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (254 kB)
-Downloading idna-3.20-py3-none-any.whl (69 kB)
-Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
-Downloading pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 19.4 MB/s  0:00:00
-Downloading imageio_ffmpeg-0.7.0-py3-none-manylinux2014_x86_64.whl (29.5 MB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29.5/29.5 MB 19.1 MB/s  0:00:01
-Downloading yt_dlp-2026.10.26-py3-none-any.whl (3.2 MB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.2/3.2 MB 19.7 MB/s  0:00:00
-Downloading gunicorn-26.2.0-py3-none-any.whl (228 kB)
-Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
-Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
-Downloading click-8.5.0-py3-none-any.whl (125 kB)
-Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
-Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
-Downloading markupsafe-3.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (23 kB)
-Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
-Installing collected packages: yt-dlp, urllib3, pillow, markupsafe, itsdangerous, imageio-ffmpeg, idna, gunicorn, click, charset_normalizer, certifi, blinker, werkzeug, requests, jinja2, Flask, flask-cors
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  0/17 [yt-dlp]  WARNING: The script yt-dlp is installed in '/home/container/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-   ━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━  6/17 [idna]  WARNING: The script idna is installed in '/home/container/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-   ━━━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━  7/17 [gunicorn]  WARNING: The scripts gunicorn and gunicornc are installed in '/home/container/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-   ━━━━━━━━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━  9/17 [charset_normalizer]  WARNING: The script normalizer is installed in '/home/container/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╺━━━━ 15/17 [Flask]  WARNING: The script flask is installed in '/home/container/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-Successfully installed Flask-3.1.3 blinker-1.9.0 certifi-2026.10.23 charset_normalizer-3.5.2 click-8.5.0 flask-cors-6.0.5 gunicorn-26.2.0 idna-3.20 imageio-ffmpeg-0.7.0 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.4 pillow-13.0.0 requests-2.34.2 urllib3-2.8.0 werkzeug-3.1.9 yt-dlp-2026.10.26
-__BOTKEEP_PROCESS_START__
-[AUTO-MINER] 🪙 Automatic Background Coin Miner started! Mining coins in background...
-[FARM ENGINE] [04:34:41] Engine Started: 24/7 Autonomous Farming Engine is now LIVE!
-==================================================
->>> BIDEO 24/7 AUTONOMOUS BOT FARMING ACTIVE
->>> Listening on: 0.0.0.0:53520
-==================================================
- * Serving Flask app 'server'
- * Debug mode: off
-WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:53520
- * Running on http://172.18.0.95:53520
-Press CTRL+C to quit
-[FARM ENGINE] [04:34:47] Hourly Bot Spawner: Current Bots: 197/300. Spawning 1 new bot...
-[FARM ENGINE] [04:34:50] New Bot Created: Bot 'manish_shorts_667' generated successfully (198/300)!
-[FARM ENGINE] [04:34:51] Instant Follow: Bot 'manish_shorts_667' immediately followed Cryvex! (Followed)
-[FARM ENGINE] [04:34:53] 🤖 Cryvex [W1] (vikram_zone_604): Watched 'Aloo Ko Baingan Ne Diya D...' (54s) + Liked ❤️
-[FARM ENGINE] [04:35:00] 🤖 Cryvex [W2] (neha_vlogs_232): Watched 'Gareeb Aloo Ko Biwi Ne Gh...' (45s)
-[FARM ENGINE] [04:35:25] 🤖 Cryvex [W1] (pooja_vlogs_648): Watched 'Gareeb Aloo Ki Supercar T...' (36s) + Liked ❤️
-[FARM ENGINE] [04:35:40] 🤖 Cryvex [W2] (rahul_vibes_892): Watched 'Aloo Raja Ki Bhains Raato...' (34s) + Liked ❤️
-[FARM ENGINE] [04:35:59] 🤖 Cryvex [W1] (neha_official_713): Watched '“Aloo Ne Poore Gaon Ko So...' (35s)
-[FARM ENGINE] [04:36:10] 🤖 Cryvex [W2] (varun_reels_40): Watched 'जब अमीर सेठ ने उड़ाया मज़...' (37s)
-[FARM ENGINE] [04:36:29] 🤖 Cryvex [W1] (sneha_reels_447): Watched 'गरीब भाई ने सड़े हुए शहतू...' (45s) + Commented: "unexpected fr..."
-[FARM ENGINE] [04:36:51] 🤖 Cryvex [W2] (kavya_daily_39): Watched 'Gareeb Aloo Bana Crorepat...' (53s)
-[FARM ENGINE] [04:37:03] 🤖 Cryvex [W1] (sneha_live_88): Watched 'Gareeb Aloo Ki Diwali 😭🪔 ...' (25s) + Liked ❤️
-[FARM ENGINE] [04:37:26] 🤖 Cryvex [W2] (aryan_star_800): Watched '🥔🧅 Gareeb Aloo-Pyaaz Ki Z...' (41s)
-[FARM ENGINE] [04:37:31] 🤖 Cryvex [W1] (alex_shorts_760): Watched 'Gareeb Aloo Ki Purani Cyc...' (53s)
-[FARM ENGINE] [04:37:54] 🤖 Cryvex [W2] (manish_daily_841): Watched 'बेटे ने निकाला घर से बाहर...' (34s)
-[FARM ENGINE] [04:38:11] 🤖 Cryvex [W1] (priya_pro_17): Watched 'Aloo Ki Behen Ki Shaadi K...' (31s) + Liked ❤️
-[FARM ENGINE] [04:38:31] 🤖 Cryvex [W2] (creator_clips_803): Watched '4 अनाथ बहनों का घर तूफान ...' (46s) + Liked ❤️ + Commented: "😂 bhai 😂..."
-[FARM ENGINE] [04:38:41] 🤖 Cryvex [W1] (pooja_media_559): Watched 'गरीब गौरी को मिला विशाल त...' (49s) + Liked ❤️ + Commented: "lol bhai..."
-[FARM ENGINE] [04:39:07] 🤖 Cryvex [W2] (rohit_live_235): Watched 'एक फैसला जिसने पूरी जिंदग...' (34s)
-[FARM ENGINE] [04:39:13] 🤖 Cryvex [W1] (alex_clips_235): Watched 'घर से निकाली गौरी ने काकी...' (42s)
-[FARM ENGINE] [04:39:43] 🤖 Cryvex [W2] (alex_shorts_760): Watched 'गरीब लड़की और उसकी गाय की...' (41s)
-[FARM ENGINE] [04:39:53] 🌐 Stealth Browse (rohit_clips_741): Browsed public feed -> Watched video by 'Kanhameghaval' (21s)
-[FARM ENGINE] [04:40:17] 🌐 Stealth Browse (kavya_live_685): Browsed public feed -> Watched video by 'Sumit1232' (18s)
-[FARM ENGINE] [04:40:24] 🤖 Cryvex [W1] (sam_vibes_578): Watched 'जंगल में मिला Giant Egg 😱...' (42s)
-[FARM ENGINE] [04:40:50] 🤖 Cryvex [W2] (kunal_vibes_254): Watched 'आलसी पत्नी को जब पति की म...' (36s)
-[FARM ENGINE] [04:40:52] 🤖 Cryvex [W1] (pooja_hub_157): Watched '5 बहनों ने उगाया विशाल आम...' (50s)
-[FARM ENGINE] [04:41:22] 🤖 Cryvex [W1] (rahul_pro_101): Watched 'गरीब बहन के घर को कहा “सब...' (35s)
-[FARM ENGINE] [04:41:32] 🤖 Cryvex [W2] (vikram_zone_604): Watched 'गरीब बहू ने खाली खेत में ...' (51s) + Liked ❤️
-[FARM ENGINE] [04:41:57] 🤖 Cryvex [W1] (divya_hub_381): Watched 'नदी में फेंके गए बेकार फू...' (52s) + Liked ❤️ + Commented: "accha tha bhai..."
-[FARM ENGINE] [04:42:02] 🤖 Cryvex [W2] (alex_daily_553): Watched '😱😭 आलू ने केले और मूली को...' (25s)
-[FARM ENGINE] [04:42:37] 🤖 Cryvex [W1] (ananya_vibes_293): Watched 'इतने बड़े आम से बना दिया ...' (26s) + Liked ❤️ + Commented: "khatarnak tha..."
-[FARM ENGINE] [04:42:44] 🤖 Cryvex [W2] (aditi_reels_202): Watched 'बंजर जमीन पर लाल मिर्च का...' (39s) + Liked ❤️
-[FARM ENGINE] [04:43:18] 🤖 Cryvex [W1] (kunal_official_773): Watched 'जंगल का रहस्यमयी 'स्वर्ण ...' (27s)
-[FARM ENGINE] [04:43:24] 🤖 Cryvex [W2] (ananya_vibes_230): Watched '1. सड़ा हुआ अनानास बना गर...' (38s)
-[FARM ENGINE] [04:43:49] 🤖 Cryvex [W1] (rohit_zone_365): Watched 'पूरा गांव उसकी मौत मान चु...' (25s)
-[FARM ENGINE] [04:43:55] 🤖 Cryvex [W2] (deepak_live_884): Watched '9 देवियो ने नवरात्रि पर अ...' (43s)
-[FARM ENGINE] [04:44:26] 🤖 Cryvex [W1] (vikram_hub_81): Watched 'जिस जमीन को सबने बेकार सम...' (25s) + Commented: "kya twist tha..."
-[FARM ENGINE] [04:44:29] 🤖 Cryvex [W2] (rahul_media_851): Watched 'बीमार माँ और लाचार बेटी न...' (25s)
-[FARM ENGINE] [04:45:07] 🤖 Cryvex [W1] (rahul_vibes_892): Watched '. 😭😂 केला और मूली का रोमा...' (35s)
-[FARM ENGINE] [04:45:07] 🤖 Cryvex [W2] (amit_vlogs_484): Watched 'आलसी पत्नी ने की किसान पत...' (49s)
-[FARM ENGINE] [04:45:40] 🤖 Cryvex [W2] (rohit_live_235): Watched 'केले के प्यार में पड़ गई ...' (42s)
-[FARM ENGINE] [04:45:46] 🤖 Cryvex [W1] (ananya_hub_739): Watched '🥔🧅 Gareeb Aloo-Pyaaz Ki Z...' (28s)
-[FARM ENGINE] [04:46:08] 🌐 Stealth Browse (vikram_hub_81): Browsed public feed -> Watched video by 'Sandeep 123' (19s)
-[FARM ENGINE] [04:46:20] 🌐 Stealth Browse (rahul_pro_101): Browsed public feed -> Watched video by 'lalurammenna' (28s)
-[FARM ENGINE] [04:46:41] 🤖 Cryvex [W2] (manish_reels_972): Watched 'Gareeb Aloo Ko Biwi Ne Gh...' (55s) + Commented: "not expected 😭..."
-[FARM ENGINE] [04:46:55] 🤖 Cryvex [W1] (kavya_star_32): Watched 'जिस बूढ़ी सास को बहू ने घ...' (55s)
-[FARM ENGINE] [04:47:20] 🤖 Cryvex [W2] (manish_shorts_667): Watched 'Aloo Ko Baingan Ne Diya D...' (33s) + Liked ❤️
-[FARM ENGINE] [04:47:33] 🤖 Cryvex [W1] (creator_shorts_159): Watched 'गरीब लड़की और उसकी गाय की...' (54s)
-[FARM ENGINE] [04:47:59] 🤖 Cryvex [W2] (ananya_clips_472): Watched 'Gareeb Aloo Ki Supercar T...' (31s)
-[FARM ENGINE] [04:48:13] 🤖 Cryvex [W1] (priya_beats_686): Watched 'Aloo Raja Ki Bhains Raato...' (51s)
-[FARM ENGINE] [04:48:36] 🤖 Cryvex [W2] (sam_reels_457): Watched 'गरीब गौरी को मिला विशाल त...' (39s)
-[FARM ENGINE] [04:48:43] 🤖 Cryvex [W1] (aditi_zone_404): Watched '“Aloo Ne Poore Gaon Ko So...' (50s)
-[FARM ENGINE] [04:49:05] 🤖 Cryvex [W2] (alex_hub_835): Watched 'Gareeb Aloo Bana Crorepat...' (49s)
-[FARM ENGINE] [04:49:11] 🤖 Cryvex [W1] (aditi_clips_108): Watched '😱 आधी रात को मूली को एप्प...' (35s)
-[FARM ENGINE] [04:49:39] 🌐 Stealth Browse (alex_hub_835): Browsed public feed -> Watched video by 'Irfan9' (15s)
-[FARM ENGINE] [04:49:45] 🤖 Cryvex [W1] (amit_beats_304): Watched 'Gareeb Aloo Ki Diwali 😭🪔 ...' (42s) + Commented: "😂 bhai 😂..."
-[FARM ENGINE] [04:50:02] 🤖 Cryvex [W2] (sneha_reels_447): Watched '4 अनाथ बहनों का घर तूफान ...' (46s)
-[FARM ENGINE] [04:50:19] 🤖 Cryvex [W1] (divya_hub_381): Watched 'Gareeb Aloo Ki Purani Cyc...' (31s)
-[FARM ENGINE] [04:50:32] 🤖 Cryvex [W2] (aditi_live_323): Watched 'Aloo Ki Behen Ki Shaadi K...' (36s)
-[FARM ENGINE] [04:50:54] 🤖 Cryvex [W1] (rahul_beats_792): Watched 'एक फैसला जिसने पूरी जिंदग...' (30s)
-[FARM ENGINE] [04:51:07] 🤖 Cryvex [W2] (kavya_shorts_252): Watched 'पूरा गांव उसकी मौत मान चु...' (44s)
-[FARM ENGINE] [04:51:23] 🤖 Cryvex [W1] (yash_vibes_196): Watched 'घर से निकाली गौरी ने काकी...' (54s) + Commented: "achha tha..."
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:41:53] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:41:53] "GET /api/cryvex/videos?channel_id=6ada0b9dfb39968c7c48dd7b HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:41:53] "GET /api/cryvex/stats?channel_id=6ada0b9dfb39968c7c48dd7b HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:41:54] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:41:55,532] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:41:55] "GET /api/farm/status HTTP/1.1" 500 -
+[FARM ENGINE] [05:41:55] 🤖 Cryvex [W1] (manish_live_717): Watched 'Aloo Raja Ki Bhains Raato...' (44s)
+51.75.76.215 - - [02/Nov/2026 05:41:56] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:41:57,554] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:41:57] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:41:58] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:41:59,754] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:41:59] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:00] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:42:01,537] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:01] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:02] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:42:03,532] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:03] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:04] "GET /api/podium/status HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:42:05] "GET /api/cryvex/auto-miner-status HTTP/1.1" 200 -
+[2026-11-02 05:42:05,544] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:05] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:06] "GET /api/podium/status HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:42:06] "GET /api/cryvex/coins HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:42:07] "GET /api/cryvex/auto-miner-status HTTP/1.1" 200 -
+51.75.76.215 - - [02/Nov/2026 05:42:08] "GET /api/cryvex/coins HTTP/1.1" 200 -
+[2026-11-02 05:42:08,493] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:08] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:09] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:42:09,540] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:09] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:10] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:42:12,493] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:12] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:13] "GET /api/podium/status HTTP/1.1" 200 -
+[2026-11-02 05:42:13,916] ERROR in app: Exception on /api/farm/status [GET]
+Traceback (most recent call last):
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/container/.local/lib/python3.13/site-packages/flask_cors/extension.py", line 206, in wrapped_function
+    return cors_after_request(app_any.make_response(f(*args, **kwargs)))
+                                                    ~^^^^^^^^^^^^^^^^^
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/container/.local/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/container/bots/server.py", line 222, in get_farm_status
+    status = AutonomousFarmEngine.get_instance().get_status()
+  File "/home/container/bots/farming_engine.py", line 271, in get_status
+    remaining_cryvex = max(0, int(self.next_cryvex_view_delay - elapsed_cryvex))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AutonomousFarmEngine' object has no attribute 'next_cryvex_view_delay'
+51.75.76.215 - - [02/Nov/2026 05:42:13] "GET /api/farm/status HTTP/1.1" 500 -
+51.75.76.215 - - [02/Nov/2026 05:42:14] "GET /api/podium/status HTTP/1.1" 200 -
+[FARM ENGINE] [05:42:15] 🤖 Cryvex [W2] (aditi_live_323): Watched 'जिस बूढ़ी सास को बहू ने घ...' (27s)
