@@ -201,6 +201,48 @@ def search_channels():
 # -------------------------------------------------------------
 # 24/7 Autonomous Farming System API
 # -------------------------------------------------------------
+@app.route("/api/miner/limits", methods=["GET"])
+def get_miner_limits():
+    """Returns 24h limits, mined amount, and ON/OFF status for all 3 bots."""
+    try:
+        from coin_miner import MiningLimitManager
+        limits = MiningLimitManager.get_instance().get_all_limits()
+        return jsonify({"success": True, "limits": limits})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/miner/limits", methods=["POST"])
+def update_miner_limits():
+    """Updates 24h limit or ON/OFF toggle for an account."""
+    body = request.get_json() or {}
+    username = body.get("username", "").strip()
+    enabled = body.get("enabled")
+    daily_limit = body.get("daily_limit")
+
+    if not username:
+        return jsonify({"success": False, "message": "username zaroori hai!"}), 400
+
+    try:
+        from coin_miner import MiningLimitManager, PodiumMinerEngine
+        res = MiningLimitManager.get_instance().update_config(
+            username=username,
+            enabled=enabled,
+            daily_limit=daily_limit
+        )
+        try:
+            PodiumMinerEngine.get_instance().sync_podium_state()
+        except Exception:
+            pass
+        return jsonify({
+            "success": True,
+            "message": f"Settings saved for {username}!",
+            "data": res
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @app.route("/api/podium/status", methods=["GET"])
 def get_podium_status():
     """Fetches live podium rankings from Firebase."""

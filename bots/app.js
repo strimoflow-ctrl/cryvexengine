@@ -62,6 +62,51 @@ document.addEventListener('DOMContentLoaded', () => {
           if (podiumRank3Coins) podiumRank3Coins.textContent = coinsStr;
           if (podiumRank3Ads) podiumRank3Ads.textContent = adsStr;
         }
+
+        // Update 24H Limit & Toggle UI for this account
+        const user = acc.username;
+        const toggleEl = document.getElementById(`toggleMiner_${user}`);
+        const limitInput = document.getElementById(`limitInput_${user}`);
+        const barEl = document.getElementById(`barMined_${user}`);
+        const txtEl = document.getElementById(`txtMined_${user}`);
+        const badgeEl = document.getElementById(`statusBadge_${user}`);
+
+        if (toggleEl && document.activeElement !== toggleEl) {
+          toggleEl.checked = acc.enabled !== false;
+        }
+
+        if (limitInput && document.activeElement !== limitInput) {
+          if (acc.daily_limit !== undefined) {
+            limitInput.value = acc.daily_limit;
+          }
+        }
+
+        const mined = Number(acc.mined_24h || 0);
+        const limit = Number(acc.daily_limit || 0);
+
+        if (barEl) {
+          const pct = limit > 0 ? Math.min(100, Math.round((mined / limit) * 100)) : 100;
+          barEl.style.width = `${pct}%`;
+        }
+
+        if (txtEl) {
+          txtEl.textContent = limit > 0
+            ? `${mined.toFixed(1)} / ${limit} Coins (24h)`
+            : `${mined.toFixed(1)} Coins (Unlimited)`;
+        }
+
+        if (badgeEl) {
+          if (acc.enabled === false) {
+            badgeEl.className = 'ctrl-status-badge paused';
+            badgeEl.textContent = '⏸️ MINING PAUSED (OFF)';
+          } else if (limit > 0 && mined >= limit) {
+            badgeEl.className = 'ctrl-status-badge limit';
+            badgeEl.textContent = '⚠️ 24H LIMIT REACHED';
+          } else {
+            badgeEl.className = 'ctrl-status-badge active';
+            badgeEl.textContent = '🟢 MINING ACTIVE';
+          }
+        }
       });
 
       // Update Live Terminal Logs
@@ -262,6 +307,61 @@ document.addEventListener('DOMContentLoaded', () => {
       loadCryvexCoins();
     });
   }
+
+  // -------------------------------------------------------------
+  // 5b. 24H Coin Mining Limit & Toggle Controls
+  // -------------------------------------------------------------
+  document.querySelectorAll('.cyber-switch input').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const user = e.target.dataset.user;
+      const enabled = e.target.checked;
+      const limitInput = document.getElementById(`limitInput_${user}`);
+      const limit = limitInput ? Number(limitInput.value) : 100;
+
+      try {
+        await fetch('/api/miner/limits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, enabled, daily_limit: limit })
+        });
+        loadPodiumStatus();
+      } catch (err) {
+        console.error('Limit toggle error:', err);
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-save-limit').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const user = e.target.dataset.user;
+      const limitInput = document.getElementById(`limitInput_${user}`);
+      const toggleEl = document.getElementById(`toggleMiner_${user}`);
+      const limit = limitInput ? Number(limitInput.value) : 100;
+      const enabled = toggleEl ? toggleEl.checked : true;
+
+      const originalText = e.target.textContent;
+      e.target.textContent = 'SAVED!';
+      e.target.style.background = '#10B981';
+      e.target.style.color = '#fff';
+
+      try {
+        await fetch('/api/miner/limits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, enabled, daily_limit: limit })
+        });
+        loadPodiumStatus();
+      } catch (err) {
+        console.error('Save limit error:', err);
+      } finally {
+        setTimeout(() => {
+          e.target.textContent = originalText;
+          e.target.style.background = '';
+          e.target.style.color = '';
+        }, 1200);
+      }
+    });
+  });
 
   // -------------------------------------------------------------
   // 6. Bootstrap Initial State & 24/7 Background Polling

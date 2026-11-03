@@ -1,0 +1,17 @@
+{
+  "cryvex": {
+    "enabled": true,
+    "daily_limit": 100.0,
+    "history": []
+  },
+  "pankaj_bideo": {
+    "enabled": true,
+    "daily_limit": 50.0,
+    "history": []
+  },
+  "hariom_ai": {
+    "enabled": true,
+    "daily_limit": 50.0,
+    "history": []
+  }
+}

@@ -18,6 +18,7 @@ Earning Streams:
 import os
 import sys
 import time
+import json
 import random
 import threading
 from datetime import datetime
@@ -83,6 +84,150 @@ PODIUM_CONFIG = [
         "min_buffer_behind": 200  # Must stay at least 200 coins below Rank 2
     }
 ]
+
+# ---------------------------------------------------------------------------
+# 24-HOUR COIN MINING LIMIT & TOGGLE CONTROLLER
+# ---------------------------------------------------------------------------
+LIMITS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mining_limits.json")
+
+
+class MiningLimitManager:
+    _instance = None
+    _lock = threading.RLock()
+
+    @classmethod
+    def get_instance(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+    def __init__(self):
+        self.file_path = LIMITS_FILE
+        self.lock = threading.RLock()
+        self.data = self._load()
+
+    def _load(self):
+        default_data = {
+            "cryvex": {"enabled": True, "daily_limit": 100.0, "history": []},
+            "pankaj_bideo": {"enabled": True, "daily_limit": 50.0, "history": []},
+            "hariom_ai": {"enabled": True, "daily_limit": 50.0, "history": []}
+        }
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                    for k, v in default_data.items():
+                        if k not in saved:
+                            saved[k] = v
+                        else:
+                            saved[k].setdefault("enabled", v["enabled"])
+                            saved[k].setdefault("daily_limit", v["daily_limit"])
+                            saved[k].setdefault("history", [])
+                    return saved
+            except Exception as e:
+                print(f"⚠️ [Limit Manager] Load error: {e}")
+        return default_data
+
+    def _save(self):
+        try:
+            temp_path = self.file_path + ".tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2)
+            if os.path.exists(self.file_path):
+                os.replace(temp_path, self.file_path)
+            else:
+                os.rename(temp_path, self.file_path)
+        except Exception as e:
+            print(f"⚠️ [Limit Manager] Save error: {e}")
+
+    def prune_history(self):
+        """Removes earnings older than 24 hours (86,400 seconds)."""
+        now = time.time()
+        cutoff = now - 86400
+        changed = False
+        for username, user_data in self.data.items():
+            hist = user_data.get("history", [])
+            new_hist = [h for h in hist if h.get("ts", 0) >= cutoff]
+            if len(new_hist) != len(hist):
+                user_data["history"] = new_hist
+                changed = True
+        if changed:
+            self._save()
+
+    def get_mined_last_24h(self, username):
+        """Calculates total coins mined by this user in the rolling last 24h."""
+        now = time.time()
+        cutoff = now - 86400
+        user_data = self.data.get(username, {})
+        hist = user_data.get("history", [])
+        return sum(float(h.get("amount", 0)) for h in hist if h.get("ts", 0) >= cutoff)
+
+    def is_mining_allowed(self, username):
+        """
+        Returns (allowed: bool, status_msg: str, mined_24h: float, limit: float)
+        """
+        with self.lock:
+            self.prune_history()
+            user_data = self.data.get(username, {"enabled": True, "daily_limit": 100.0, "history": []})
+            enabled = user_data.get("enabled", True)
+            limit = float(user_data.get("daily_limit", 100.0))
+            mined_24h = self.get_mined_last_24h(username)
+
+            if not enabled:
+                return False, "⏸️ Mining Disabled (OFF)", mined_24h, limit
+
+            if limit > 0 and mined_24h >= limit:
+                return False, f"⚠️ 24h Limit Reached ({mined_24h:.1f}/{limit:.1f})", mined_24h, limit
+
+            return True, "🟢 Active", mined_24h, limit
+
+    def record_earning(self, username, amount, coin_type="watch"):
+        with self.lock:
+            user_data = self.data.setdefault(username, {"enabled": True, "daily_limit": 100.0, "history": []})
+            user_data.setdefault("history", []).append({
+                "ts": time.time(),
+                "amount": float(amount),
+                "type": coin_type
+            })
+            self.prune_history()
+            self._save()
+
+    def update_config(self, username, enabled=None, daily_limit=None):
+        with self.lock:
+            user_data = self.data.setdefault(username, {"enabled": True, "daily_limit": 100.0, "history": []})
+            if enabled is not None:
+                user_data["enabled"] = bool(enabled)
+            if daily_limit is not None:
+                user_data["daily_limit"] = max(0.0, float(daily_limit))
+            self._save()
+            mined_24h = self.get_mined_last_24h(username)
+            return {
+                "username": username,
+                "enabled": user_data["enabled"],
+                "daily_limit": user_data["daily_limit"],
+                "mined_24h": round(mined_24h, 1)
+            }
+
+    def get_all_limits(self):
+        with self.lock:
+            self.prune_history()
+            res = {}
+            for u in ["cryvex", "pankaj_bideo", "hariom_ai"]:
+                user_data = self.data.get(u, {"enabled": True, "daily_limit": 100.0, "history": []})
+                enabled = user_data.get("enabled", True)
+                limit = float(user_data.get("daily_limit", 100.0))
+                mined = round(self.get_mined_last_24h(u), 1)
+                allowed, reason, _, _ = self.is_mining_allowed(u)
+                res[u] = {
+                    "enabled": enabled,
+                    "daily_limit": limit,
+                    "mined_24h": mined,
+                    "remaining": max(0.0, round(limit - mined, 1)) if limit > 0 else 999999,
+                    "status_text": reason,
+                    "is_allowed": allowed
+                }
+            return res
 
 
 class AccountSession:
@@ -264,6 +409,7 @@ class PodiumMinerEngine:
 
     def __init__(self):
         self.accounts = [AccountSession(cfg) for cfg in PODIUM_CONFIG]
+        self.limit_mgr = MiningLimitManager.get_instance()
         self.running = False
         self.video_catalog = []
         self.catalog_lock = threading.Lock()
@@ -280,10 +426,12 @@ class PodiumMinerEngine:
     def sync_podium_state(self):
         """Pushes current coin balances and recent logs to Firebase."""
         try:
+            limits_map = self.limit_mgr.get_all_limits()
             payload = {
                 "last_updated": datetime.now().isoformat(),
                 "total_coins_podium": sum(a.coins for a in self.accounts),
                 "recent_logs": list(self.logs),
+                "limits": limits_map,
                 "accounts": [
                     {
                         "rank": a.rank,
@@ -296,7 +444,13 @@ class PodiumMinerEngine:
                         "ad_coins": round(a.ad_coins_mined, 1),
                         "ads_watched": a.ads_watched,
                         "ads_remaining": a.ads_remaining,
-                        "status": a.status
+                        "status": a.status,
+                        "enabled": limits_map.get(a.username, {}).get("enabled", True),
+                        "daily_limit": limits_map.get(a.username, {}).get("daily_limit", 100.0),
+                        "mined_24h": limits_map.get(a.username, {}).get("mined_24h", 0.0),
+                        "remaining_24h": limits_map.get(a.username, {}).get("remaining", 100.0),
+                        "limit_status": limits_map.get(a.username, {}).get("status_text", "🟢 Active"),
+                        "is_allowed": limits_map.get(a.username, {}).get("is_allowed", True)
                     }
                     for a in self.accounts
                 ]
@@ -355,10 +509,17 @@ class PodiumMinerEngine:
 
         while self.running:
             try:
+                # 24h Coin Mining Limit & Toggle Check
+                allowed, reason, _, _ = self.limit_mgr.is_mining_allowed(acc.username)
+                if not allowed:
+                    time.sleep(15)
+                    continue
+
                 acc.refresh_coins_status()
                 if acc.ads_remaining > 0 and time.time() >= acc.ad_cooldown_until:
                     claimed = acc.claim_ad_reward()
                     if claimed:
+                        self.limit_mgr.record_earning(acc.username, 2.0, "ad")
                         now_str = datetime.now().strftime("%H:%M:%S")
                         print(f"{CLR_GOLD}[{now_str}] 🎁 [AD REWARD] {acc.label} ({acc.username}) Claimed +2.0 Coins ──► Balance: {acc.coins:.1f} Coins (Ads Left: {acc.ads_remaining}/16){CLR_RESET}")
                         self.add_log(f"🎁 AD REWARD [{acc.label}]", f"Claimed +2.0 Coins (Balance: {acc.coins:.1f} | Ads Left: {acc.ads_remaining}/16)", "coin-reward")
@@ -378,6 +539,13 @@ class PodiumMinerEngine:
 
         while self.running:
             try:
+                # 24h Coin Mining Limit & Toggle Check
+                allowed, reason, mined_24h, limit = self.limit_mgr.is_mining_allowed(acc.username)
+                if not allowed:
+                    acc.status = reason
+                    time.sleep(10)
+                    continue
+
                 # Hierarchy Safety Check:
                 # Rank 2 must never overtake Rank 1 (Cryvex stays apex)
                 # Rank 3 must never overtake Rank 2 (Pankaj stays #2)
@@ -394,7 +562,7 @@ class PodiumMinerEngine:
                         time.sleep(15)
                         continue
 
-                acc.status = f"Streaming #{stream_id}"
+                acc.status = f"Streaming #{stream_id} ({mined_24h:.0f}/{limit:.0f} 24h)"
 
                 target = self.get_target_video(acc.user_id)
                 if not target:
@@ -416,6 +584,7 @@ class PodiumMinerEngine:
                 # Submit watch time
                 success, earned = acc.report_watch_time(target["id"], watch_duration)
                 if success and earned > 0:
+                    self.limit_mgr.record_earning(acc.username, earned, "watch")
                     now_str = datetime.now().strftime("%H:%M:%S")
                     print(f"{CLR_GREEN}[{now_str}] 🪙 [COIN MINED] {acc.label} [S{stream_id}] ({acc.username}) Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Total: {acc.coins:.1f}{CLR_RESET}")
                     self.add_log(f"🪙 COIN MINED [{acc.label}]", f"[Stream #{stream_id}] Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Vault: {acc.coins:.1f}", "coin-reward")

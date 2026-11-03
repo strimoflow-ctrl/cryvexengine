@@ -2137,6 +2137,219 @@ body.cyber-theme {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* 24H COIN MINING LIMIT & TOGGLE CONTROLLER STYLES                           */
+/* -------------------------------------------------------------------------- */
+.podium-controls-box {
+  margin-top: 14px;
+  padding: 12px;
+  background: rgba(10, 15, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.ctrl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ctrl-label {
+  font-family: 'Orbitron', monospace, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #94A3B8;
+}
+
+/* Cyber Toggle Switch */
+.cyber-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.cyber-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cyber-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 20px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cyber-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #94a3b8;
+  border-radius: 50%;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cyber-switch input:checked + .cyber-slider {
+  background-color: rgba(16, 185, 129, 0.25);
+  border-color: #10B981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.cyber-switch input:checked + .cyber-slider:before {
+  transform: translateX(22px);
+  background-color: #10B981;
+  box-shadow: 0 0 8px #10B981;
+}
+
+/* Limit Input Row */
+.ctrl-limit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-with-label {
+  display: flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex: 1;
+}
+
+.input-prefix, .input-suffix {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: #64748B;
+  font-weight: 700;
+}
+
+.cyber-input-limit {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #F8FAFC;
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px;
+}
+
+.cyber-input-limit:focus {
+  color: #38BDF8;
+}
+
+.btn-save-limit {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38BDF8;
+  font-family: 'Orbitron', monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-save-limit:hover {
+  background: #38BDF8;
+  color: #0F172A;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Progress Bar */
+.ctrl-progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ctrl-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ctrl-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.gold-fill {
+  background: linear-gradient(90deg, #F59E0B, #FBBF24);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.cyan-fill {
+  background: linear-gradient(90deg, #06B6D4, #38BDF8);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+}
+
+.purple-fill {
+  background: linear-gradient(90deg, #8B5CF6, #A855F7);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+}
+
+.ctrl-mined-txt {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: #94A3B8;
+  text-align: right;
+}
+
+/* Status Badges */
+.ctrl-status-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.ctrl-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ctrl-status-badge.paused {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ctrl-status-badge.limit {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 
 
 
