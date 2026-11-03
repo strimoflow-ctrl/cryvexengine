@@ -283,10 +283,7 @@ def toggle_farm():
 
 
 if __name__ == "__main__":
-    # 1. Start 24/7 background automatic coin claimer
-    AutoCoinMiner.get_instance().start()
-
-    # 2. Start 24/7 multi-stream podium miner (Rank 1 Cryvex, Rank 2 Pankaj, Rank 3 Hariom)
+    # 1. 24/7 multi-stream podium miner (Rank 1 Cryvex, Rank 2 Pankaj, Rank 3 Hariom) with 24h limits & toggles
     try:
         from coin_miner import PodiumMinerEngine
         PodiumMinerEngine.get_instance().start_in_background()
@@ -294,7 +291,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"⚠️ [PODIUM MINER] Failed to auto-start: {e}")
 
-    # 3. Start 24/7 autonomous farming engine (anti-rush, hourly spawner, review watchdog)
+    # 2. Start 24/7 autonomous farming engine (anti-rush, hourly spawner, review watchdog)
     AutonomousFarmEngine.get_instance().start()
 
     port = int(os.environ.get("PORT") or os.environ.get("SERVER_PORT") or os.environ.get("BOTS_PORT", 5050))

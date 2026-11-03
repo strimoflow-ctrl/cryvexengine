@@ -168,6 +168,7 @@ class MiningLimitManager:
         Returns (allowed: bool, status_msg: str, mined_24h: float, limit: float)
         """
         with self.lock:
+            self.data = self._load()
             self.prune_history()
             user_data = self.data.get(username, {"enabled": True, "daily_limit": 100.0, "history": []})
             enabled = user_data.get("enabled", True)
@@ -184,6 +185,7 @@ class MiningLimitManager:
 
     def record_earning(self, username, amount, coin_type="watch"):
         with self.lock:
+            self.data = self._load()
             user_data = self.data.setdefault(username, {"enabled": True, "daily_limit": 100.0, "history": []})
             user_data.setdefault("history", []).append({
                 "ts": time.time(),
@@ -195,6 +197,7 @@ class MiningLimitManager:
 
     def update_config(self, username, enabled=None, daily_limit=None):
         with self.lock:
+            self.data = self._load()
             user_data = self.data.setdefault(username, {"enabled": True, "daily_limit": 100.0, "history": []})
             if enabled is not None:
                 user_data["enabled"] = bool(enabled)
@@ -211,6 +214,7 @@ class MiningLimitManager:
 
     def get_all_limits(self):
         with self.lock:
+            self.data = self._load()
             self.prune_history()
             res = {}
             for u in ["cryvex", "pankaj_bideo", "hariom_ai"]:
@@ -218,7 +222,15 @@ class MiningLimitManager:
                 enabled = user_data.get("enabled", True)
                 limit = float(user_data.get("daily_limit", 100.0))
                 mined = round(self.get_mined_last_24h(u), 1)
-                allowed, reason, _, _ = self.is_mining_allowed(u)
+                if not enabled:
+                    reason = "⏸️ Mining Disabled (OFF)"
+                    allowed = False
+                elif limit > 0 and mined >= limit:
+                    reason = f"⚠️ 24h Limit Reached ({mined:.1f}/{limit:.1f})"
+                    allowed = False
+                else:
+                    reason = "🟢 Active"
+                    allowed = True
                 res[u] = {
                     "enabled": enabled,
                     "daily_limit": limit,
@@ -638,9 +650,20 @@ class PodiumMinerEngine:
                 now_str = datetime.now().strftime("%H:%M:%S")
                 print("\n" + CLR_CYAN + "═" * 75 + CLR_RESET)
                 print(f"{CLR_BOLD}📊 [PODIUM LIVE STATUS @ {now_str}]{CLR_RESET}")
+                limits_map = self.limit_mgr.get_all_limits()
                 for acc in self.accounts:
                     color = CLR_GOLD if acc.rank == 1 else (CLR_CYAN if acc.rank == 2 else CLR_PURPLE)
-                    print(f"   {color}{acc.label} ({acc.username}){CLR_RESET}: Balance = {CLR_BOLD}{acc.coins:.1f} Coins{CLR_RESET} | Mined = {CLR_GREEN}+{acc.session_coins_mined:.1f}{CLR_RESET} (Watch: {acc.watch_coins_mined:.0f}, Ads: {acc.ad_coins_mined:.0f}) | Ads Left: {acc.ads_remaining}/16")
+                    u_lim = limits_map.get(acc.username, {})
+                    is_on = u_lim.get("enabled", True)
+                    mined_24h = u_lim.get("mined_24h", 0.0)
+                    limit_val = u_lim.get("daily_limit", 100.0)
+                    if not is_on:
+                        tag = f"{CLR_RED}[⏸️ PAUSED / OFF]{CLR_RESET}"
+                    elif limit_val > 0 and mined_24h >= limit_val:
+                        tag = f"{CLR_GOLD}[⚠️ 24H LIMIT REACHED]{CLR_RESET}"
+                    else:
+                        tag = f"{CLR_GREEN}[🟢 MINING ACTIVE]{CLR_RESET}"
+                    print(f"   {color}{acc.label} ({acc.username}){CLR_RESET}: {tag} Balance = {CLR_BOLD}{acc.coins:.1f} Coins{CLR_RESET} | 24h Mined: {mined_24h:.1f}/{limit_val:.0f} (Session Mined: +{acc.session_coins_mined:.1f}) | Ads Left: {acc.ads_remaining}/16")
                 print(CLR_CYAN + "═" * 75 + CLR_RESET + "\n")
         except KeyboardInterrupt:
             print("\n🛑 Stopping Podium Coin Miner cleanly...")
