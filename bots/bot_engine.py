@@ -819,6 +819,18 @@ class AutoCoinMiner:
         time.sleep(2)
         while self.running:
             try:
+                # 0. Check 24h limit manager
+                try:
+                    from coin_miner import MiningLimitManager
+                    allowed, reason, _, _ = MiningLimitManager.get_instance().is_mining_allowed("cryvex")
+                    if not allowed:
+                        self.status["state"] = "paused"
+                        self.status["message"] = f"Mining Paused: {reason}"
+                        time.sleep(15)
+                        continue
+                except Exception:
+                    pass
+
                 # 1. Fetch live Cryvex coins & daily ad status
                 status_res = BotEngine.get_cryvex_coins_status()
                 if not status_res.get("success"):

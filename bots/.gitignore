@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.log
+server logs
+telegram_session.session
+pfp_engine/media/*
+!pfp_engine/media/.gitkeep

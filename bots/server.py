@@ -17,6 +17,16 @@ if sys.platform == "win32":
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
 
+# -------------------------------------------------------------
+# NOX PFP Pinterest & Monetag Automation Engine
+# -------------------------------------------------------------
+try:
+    from pfp_engine import pfp_bp, start_pfp_background_thread
+    app.register_blueprint(pfp_bp)
+    print("✅ [NOX PFP] Pinterest & Monetag Blueprint registered successfully!")
+except Exception as e:
+    print(f"⚠️ [NOX PFP] Blueprint registration error: {e}")
+
 
 # -------------------------------------------------------------
 # Frontend Routes
@@ -293,6 +303,13 @@ if __name__ == "__main__":
 
     # 2. Start 24/7 autonomous farming engine (anti-rush, hourly spawner, review watchdog)
     AutonomousFarmEngine.get_instance().start()
+
+    # 3. Start 24/7 NOX PFP Pinterest & Monetag Automation Engine
+    try:
+        start_pfp_background_thread()
+        print("⚡ [NOX PFP] 24/7 Pinterest Auto-Poster & Telegram Scraper active in background!")
+    except Exception as e:
+        print(f"⚠️ [NOX PFP] Failed to start background worker: {e}")
 
     port = int(os.environ.get("PORT") or os.environ.get("SERVER_PORT") or os.environ.get("BOTS_PORT", 5050))
     print("==================================================")

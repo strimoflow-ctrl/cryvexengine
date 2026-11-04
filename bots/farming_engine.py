@@ -442,7 +442,7 @@ class AutonomousFarmEngine:
             # 2. Send Watch-Time Retention
             requests.post(f"https://bideo.in/api/videos/{vid_id}/watch-time", headers=headers, json={"watchTime": watch_seconds}, timeout=6)
 
-            action_summary = f"Watched '{title[:25]}...' ({watch_seconds}s)"
+            action_summary = f"Boosted Cryvex video '{title[:25]}...' ({watch_seconds}s)"
 
             # 3. 50% Chance: Like (if not already liked by this bot)
             liked = False
@@ -464,7 +464,7 @@ class AutonomousFarmEngine:
                 commented = True
                 action_summary += f" + Commented: \"{comment_text[:20]}...\""
 
-            self._log(f"🤖 Cryvex [W{worker_id}] ({bot_name})", action_summary, "success")
+            self._log(f"👁️ [VIEW BOOSTER] Bot ({bot_name})", action_summary, "success")
             return True
 
         except Exception as e:
