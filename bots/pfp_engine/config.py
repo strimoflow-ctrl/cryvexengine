@@ -27,7 +27,7 @@ PINTEREST_BOARD_ID = os.getenv("PINTEREST_BOARD_ID", "1043357507362929953").stri
 POST_INTERVAL_MINUTES = get_int_env("POST_INTERVAL_MINUTES", 35)
 
 # ================= WEB APP & MONETAG CONFIG =================
-SITE_BASE_URL = os.getenv("SITE_BASE_URL", "").strip()
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://wfbfde.bot-keep.xyz").strip()
 TIMER_SECONDS = get_int_env("TIMER_SECONDS", 9)
 MONETAG_DIRECT_LINK = os.getenv("MONETAG_DIRECT_LINK", "https://otieuwai.net/4/your_monetag_direct_link").strip()
 MONETAG_SCRIPT_TAG = os.getenv("MONETAG_SCRIPT_TAG", """

@@ -20,9 +20,56 @@ pfp_bp = Blueprint(
     static_folder=str(STATIC_DIR)
 )
 
+_worker_thread = None
+_worker_lock = threading.Lock()
+
+def pfp_background_worker():
+    """
+    Background worker thread:
+    - Auto-scrapes from t.me/Nox_oo1 when queue is empty
+    - Auto-posts 1 pin to Pinterest every POST_INTERVAL_MINUTES (35 min)
+    - Sends Telegram Bot notification to owner on each pin
+    """
+    time.sleep(5) # brief initial delay
+    print("🚀 [PFP ENGINE] 24/7 Background Pinterest & Telegram Worker Active!")
+    database.init_db()
+    
+    while True:
+        try:
+            item = database.get_next_unposted_item()
+            if not item:
+                print("📥 [PFP ENGINE] Queue empty. Scraping new batch from Telegram Nox_oo1...")
+                scrape_telegram_web(max_items=25)
+                item = database.get_next_unposted_item()
+
+            if item:
+                print(f"📌 [PFP ENGINE] Auto-posting Pin #{item['id']} to Pinterest...")
+                post_single_item(item)
+            else:
+                print("[*] [PFP ENGINE] No items available to post right now.")
+        except Exception as e:
+            print(f"⚠️ [PFP ENGINE] Error in background worker: {e}")
+
+        sleep_secs = max(config.POST_INTERVAL_MINUTES * 60, 600)
+        time.sleep(sleep_secs)
+
+def start_pfp_background_thread():
+    global _worker_thread
+    with _worker_lock:
+        if _worker_thread is None or not _worker_thread.is_alive():
+            _worker_thread = threading.Thread(target=pfp_background_worker, daemon=True, name="PFP-Worker")
+            _worker_thread.start()
+            print("⚡ [PFP ENGINE] Background Worker Thread launched successfully!")
+    return _worker_thread
+
 @pfp_bp.record_once
 def on_register(state):
     database.init_db()
+    start_pfp_background_thread()
+
+@pfp_bp.before_app_request
+def check_worker():
+    start_pfp_background_thread()
 
 @pfp_bp.route("/pfp-static/<path:filename>")
 def pfp_static(filename):
@@ -87,38 +134,22 @@ def serve_media(filename):
 def api_pfp_stats():
     return jsonify(database.get_stats())
 
-def pfp_background_worker():
-    """
-    Background worker thread:
-    - Auto-scrapes from t.me/Nox_oo1 when queue has < 5 items
-    - Auto-posts 1 pin to Pinterest every POST_INTERVAL_MINUTES (35 min)
-    - Sends Telegram Bot notification to owner on each pin
-    """
-    time.sleep(20) # wait for web server to start cleanly
-    print("🚀 [PFP ENGINE] Background Pinterest & Telegram Worker Active!")
+@pfp_bp.route("/api/pfp/post-now")
+def api_pfp_post_now():
+    """Manually trigger 1 pin post and scrape if needed."""
     database.init_db()
-    
-    while True:
-        try:
-            item = database.get_next_unposted_item()
-            if not item:
-                print("📥 [PFP ENGINE] Queue empty. Scraping new batch from Telegram Nox_oo1...")
-                scrape_telegram_web(max_items=25)
-                item = database.get_next_unposted_item()
-
-            if item:
-                print(f"📌 [PFP ENGINE] Auto-posting Pin #{item['id']} to Pinterest...")
-                post_single_item(item)
-            else:
-                print("[*] [PFP ENGINE] No items available to post right now.")
-        except Exception as e:
-            print(f"⚠️ [PFP ENGINE] Error in background worker: {e}")
-
-        sleep_secs = max(config.POST_INTERVAL_MINUTES * 60, 600)
-        time.sleep(sleep_secs)
-
-def start_pfp_background_thread():
-    t = threading.Thread(target=pfp_background_worker, daemon=True, name="PFP-Worker")
-    t.start()
-    return t
-
+    item = database.get_next_unposted_item()
+    if not item:
+        scrape_telegram_web(max_items=10)
+        item = database.get_next_unposted_item()
+        
+    if not item:
+        return jsonify({"success": False, "message": "No unposted items found"})
+        
+    ok = post_single_item(item)
+    return jsonify({
+        "success": ok,
+        "posted_item": item["id"],
+        "title": item["seo_title"],
+        "stats": database.get_stats()
+    })
