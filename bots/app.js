@@ -377,6 +377,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const addChannelFeedback = document.getElementById('addChannelFeedback');
   const channelsViewsGrid = document.getElementById('channelsViewsGrid');
 
+  // Master Global View Controller Elements
+  const globalViewToggle = document.getElementById('globalViewToggle');
+  const globalSwitchLabel = document.getElementById('globalSwitchLabel');
+  const globalLimitInput = document.getElementById('globalLimitInput');
+  const saveGlobalLimitBtn = document.getElementById('saveGlobalLimitBtn');
+  const globalViewsProgressTxt = document.getElementById('globalViewsProgressTxt');
+  const globalBreakdownTxt = document.getElementById('globalBreakdownTxt');
+  const globalBarFill = document.getElementById('globalBarFill');
+  const globalStatusBadge = document.getElementById('globalStatusBadge');
+
   let cachedChannels = [];
 
   async function loadViewChannels() {
@@ -400,14 +410,58 @@ document.addEventListener('DOMContentLoaded', () => {
         activeChannelsCountBadge.textContent = `${count} Channel${count === 1 ? '' : 's'}`;
       }
 
+      // Update Master Global View Controller UI
+      if (globalViewToggle && document.activeElement !== globalViewToggle) {
+        globalViewToggle.checked = data.global_enabled !== false;
+      }
+      if (globalSwitchLabel) {
+        const isGlobalOn = data.global_enabled !== false;
+        globalSwitchLabel.textContent = isGlobalOn ? 'VIEW BOT: ON' : 'VIEW BOT: OFF';
+        globalSwitchLabel.className = isGlobalOn ? 'switch-helper-text' : 'switch-helper-text off';
+      }
+      if (globalLimitInput && document.activeElement !== globalLimitInput) {
+        if (data.global_daily_limit !== undefined) {
+          globalLimitInput.value = data.global_daily_limit;
+        }
+      }
+      if (globalViewsProgressTxt) {
+        const gLimit = data.global_daily_limit || 100;
+        const gTotal = data.total_views_24h || 0;
+        const gPct = data.global_progress_pct || 0;
+        globalViewsProgressTxt.textContent = gLimit > 0
+          ? `${gTotal} / ${gLimit} Global Views (${gPct}%)`
+          : `${gTotal} Global Views (Unlimited)`;
+      }
+      if (globalBreakdownTxt) {
+        globalBreakdownTxt.textContent = `Channels: ${data.channel_views_24h || 0} | Explore: ${data.stealth_views_24h || 0}`;
+      }
+      if (globalBarFill) {
+        globalBarFill.style.width = `${data.global_progress_pct || 0}%`;
+      }
+      if (globalStatusBadge) {
+        if (data.global_enabled === false) {
+          globalStatusBadge.className = 'ctrl-status-badge paused global-badge';
+          globalStatusBadge.textContent = '⏸️ MASTER VIEW ENGINE OFF (STANDBY)';
+        } else if (data.global_daily_limit > 0 && (data.total_views_24h || 0) >= data.global_daily_limit) {
+          globalStatusBadge.className = 'ctrl-status-badge standby global-badge';
+          globalStatusBadge.textContent = '💤 24H GLOBAL LIMIT COMPLETED (STANDBY)';
+        } else {
+          globalStatusBadge.className = 'ctrl-status-badge active global-badge';
+          globalStatusBadge.textContent = '🟢 GLOBAL ENGINE ACTIVE';
+        }
+      }
+
       // Check farming engine mode
       if (resFarm && resFarm.ok) {
         const farmData = await resFarm.json();
         if (farmData.success && farmData.status && farmingModeBadge) {
           const mode = farmData.status.current_mode || 'Target Channel Views';
-          if (mode.toLowerCase().includes('stealth')) {
+          if (mode.toLowerCase().includes('standby')) {
             farmingModeBadge.className = 'mode-badge-stealth';
-            farmingModeBadge.textContent = '🛡️ STEALTH BROWSING (ALL TARGETS MET)';
+            farmingModeBadge.textContent = '💤 ENGINE STANDBY (TARGET MET / OFF)';
+          } else if (mode.toLowerCase().includes('stealth')) {
+            farmingModeBadge.className = 'mode-badge-stealth';
+            farmingModeBadge.textContent = '🛡️ STEALTH BROWSING (EXPLORE FEED)';
           } else {
             farmingModeBadge.className = 'mode-badge-green';
             farmingModeBadge.textContent = '🟢 TARGET BOOSTING';
@@ -654,6 +708,52 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           if (addChannelFeedback) addChannelFeedback.textContent = '';
         }, 5000);
+      }
+    });
+  }
+
+  // Handle Master Global View Controller Toggle & Limit Save
+  if (globalViewToggle) {
+    globalViewToggle.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+      try {
+        await fetch('/api/views/global/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+        loadViewChannels();
+      } catch (err) {
+        console.error('Global toggle error:', err);
+      }
+    });
+  }
+
+  if (saveGlobalLimitBtn) {
+    saveGlobalLimitBtn.addEventListener('click', async (e) => {
+      const limitVal = globalLimitInput ? Number(globalLimitInput.value) : 100;
+      const toggleChecked = globalViewToggle ? globalViewToggle.checked : true;
+
+      const origText = saveGlobalLimitBtn.textContent;
+      saveGlobalLimitBtn.textContent = 'SAVED!';
+      saveGlobalLimitBtn.style.background = '#10B981';
+      saveGlobalLimitBtn.style.color = '#fff';
+
+      try {
+        await fetch('/api/views/global', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ daily_limit: limitVal, enabled: toggleChecked })
+        });
+        loadViewChannels();
+      } catch (err) {
+        console.error('Save global limit error:', err);
+      } finally {
+        setTimeout(() => {
+          saveGlobalLimitBtn.textContent = origText;
+          saveGlobalLimitBtn.style.background = '';
+          saveGlobalLimitBtn.style.color = '';
+        }, 1200);
       }
     });
   }

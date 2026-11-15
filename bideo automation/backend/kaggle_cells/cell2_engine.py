@@ -19,6 +19,12 @@ from datetime import datetime
 FIREBASE_DB_URL = "https://secret-gpt-default-rtdb.asia-southeast1.firebasedatabase.app"
 FIREBASE_ROOT = "bideo_automation"
 BIDEO_API_BASE = "https://bideo.in/api"
+TARGET_BIDEO_USER_ID = ""  # Auto-injected by KaggleManager for parallel multi-channel runs
+
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+}
 
 # 11 Hours 30 Minutes Session Cap (41,400 seconds)
 MAX_RUNTIME_SECONDS = 11.5 * 3600
@@ -74,22 +80,25 @@ def fb_delete(path):
         print(f"[Firebase Error] DELETE /{path}: {e}")
         return False
 
-# Register session lease in Firebase immediately
-fb_put("worker_lease", {
+# Register session lease in Firebase immediately (Scoped per channel to allow parallel execution)
+LEASE_KEY = f"worker_lease_{TARGET_BIDEO_USER_ID}" if TARGET_BIDEO_USER_ID else "worker_lease"
+
+fb_put(LEASE_KEY, {
     "active_session_id": MY_SESSION_ID,
+    "bideo_user_id": TARGET_BIDEO_USER_ID,
     "started_at": datetime.now().isoformat(),
     "host": "Kaggle Cloud (Google Infrastructure)"
 })
 
 def check_worker_lease():
-    """Immediately stops container if a newer Kaggle session has been launched."""
+    """Stops container only if a newer session for THIS SAME CHANNEL has been launched."""
     try:
-        lease = fb_get("worker_lease")
+        lease = fb_get(LEASE_KEY)
         if lease and isinstance(lease, dict):
             active_id = lease.get("active_session_id")
             if active_id and active_id != MY_SESSION_ID:
-                print(f"\n🛑 [Kaggle Engine] Session superseded by newer session '{active_id}'.")
-                print(f"🛑 Terminating old session ({MY_SESSION_ID}) immediately to prevent duplicate uploads!")
+                print(f"\n🛑 [Kaggle Engine] Session for {TARGET_BIDEO_USER_ID or 'default'} superseded by '{active_id}'.")
+                print(f"🛑 Terminating old session ({MY_SESSION_ID}) to prevent duplicate uploads!")
                 import os
                 os.system("pkill -9 -f jupyter")
                 os._exit(0)
@@ -127,9 +136,12 @@ def update_heartbeat(current_task="Idle - Monitoring channels & queue", is_busy=
         "is_busy": is_busy,
         "current_task": current_task,
         "total_uploaded_count": total_uploaded_count,
+        "target_bideo_user_id": TARGET_BIDEO_USER_ID,
         "engine_host": "Kaggle Cloud (Google Infrastructure)"
     }
     fb_put("kaggle_status", status_data)
+    if TARGET_BIDEO_USER_ID:
+        fb_put(f"kaggle_status_{TARGET_BIDEO_USER_ID}", status_data)
 
 # Send immediate startup heartbeat
 update_heartbeat("Booted on Google Cloud - Engine Active!", is_busy=False)
@@ -338,8 +350,8 @@ def ensure_valid_token(bideo_user_id):
         try:
             r = requests.get(
                 f"{BIDEO_API_BASE}/auth/me",
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=8
+                headers={**BROWSER_HEADERS, "Authorization": f"Bearer {token}"},
+                timeout=10
             )
             if r.status_code == 200 and r.json().get("success"):
                 return token
@@ -350,13 +362,14 @@ def ensure_valid_token(bideo_user_id):
     phone = account.get("phone")
     password = account.get("password")
     if phone and password:
-        print(f"🔄 [Auto-Auth] Bideo token expired/invalid. Logging in with {phone}...")
+        clean_phone = str(phone).strip()
+        print(f"🔄 [Auto-Auth] Bideo token expired/invalid. Logging in with {clean_phone}...")
         try:
             resp = requests.post(
                 f"{BIDEO_API_BASE}/auth/login",
-                json={"phone": phone, "password": password, "login": phone, "username": phone},
-                headers={"Content-Type": "application/json"},
-                timeout=20
+                json={"phone": clean_phone, "password": password, "login": clean_phone, "username": clean_phone},
+                headers={**BROWSER_HEADERS, "Content-Type": "application/json"},
+                timeout=25
             )
             data = resp.json()
             if resp.ok and data.get("success"):
@@ -403,9 +416,9 @@ def upload_to_bideo(token, video_path, thumb_path, title, description, category_
                     data["category"] = category_id
 
                 auth_header = f"Bearer {token}" if not token.startswith("Bearer ") else token
-                headers = {"Authorization": auth_header}
+                headers = {**BROWSER_HEADERS, "Authorization": auth_header}
 
-                r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=180)
+                r = requests.post(f"{BIDEO_API_BASE}/videos/upload", files=files, data=data, headers=headers, timeout=240)
                 try:
                     res_json = r.json()
                 except Exception:
@@ -726,7 +739,24 @@ def process_active_batch():
     4. Upon finishing all videos, marks batch complete and cleanly shuts down container.
     """
     check_worker_lease()
-    batch = fb_get("active_batch")
+    batch = None
+    batch_key = "active_batch"
+    if TARGET_BIDEO_USER_ID:
+        batch = fb_get(f"active_batches/{TARGET_BIDEO_USER_ID}")
+        if batch and isinstance(batch, dict):
+            batch_key = f"active_batches/{TARGET_BIDEO_USER_ID}"
+    if not batch or not isinstance(batch, dict):
+        batch = fb_get("active_batch")
+        batch_key = "active_batch"
+
+    def patch_batch(patch_data):
+        fb_patch(batch_key, patch_data)
+        if batch_key != "active_batch":
+            fb_patch("active_batch", patch_data)
+
+    def get_current_batch():
+        return fb_get(batch_key) or fb_get("active_batch")
+
     if not batch or not isinstance(batch, dict):
         return False
     
@@ -755,7 +785,7 @@ def process_active_batch():
     
     if not to_process:
         print("🎉 All videos in this batch have already been posted!")
-        fb_patch("active_batch", {"status": "completed", "completed_at": datetime.now().isoformat()})
+        patch_batch({"status": "completed", "completed_at": datetime.now().isoformat()})
         return True
 
     print("\n" + "=" * 65)
@@ -764,7 +794,7 @@ def process_active_batch():
     print(f"⏱️ Target Schedule Spread: ~{pacing_hours} Hours")
     print("=" * 65)
     
-    fb_patch("active_batch", {"status": "running", "started_at": datetime.now().isoformat()})
+    patch_batch({"status": "running", "started_at": datetime.now().isoformat()})
     
     downloads_dir = "/kaggle/working/downloads"
     os.makedirs(downloads_dir, exist_ok=True)
@@ -773,7 +803,7 @@ def process_active_batch():
     downloaded_data = []
     for idx, v in enumerate(to_process):
         check_worker_lease()
-        curr_batch = fb_get("active_batch")
+        curr_batch = get_current_batch()
         if curr_batch and curr_batch.get("status") == "cancelled":
             print("🛑 Batch cancelled by user!")
             return True
@@ -797,7 +827,7 @@ def process_active_batch():
             
     if not downloaded_data:
         print("❌ Could not download any videos in batch.")
-        fb_patch("active_batch", {"status": "failed", "error": "All downloads failed"})
+        patch_batch({"status": "failed", "error": "All downloads failed"})
         return True
         
     # PHASE 2: Spaced-out Uploading across pacing duration
@@ -809,7 +839,7 @@ def process_active_batch():
     
     for idx, item in enumerate(downloaded_data):
         check_worker_lease()
-        curr_batch = fb_get("active_batch")
+        curr_batch = get_current_batch()
         if curr_batch and curr_batch.get("status") == "cancelled":
             print("🛑 Batch cancelled by user!")
             break
@@ -863,7 +893,7 @@ def process_active_batch():
                         "uploaded_at": now_iso
                     })
                     
-                fb_patch("active_batch", {
+                patch_batch({
                     "completed_count": idx + 1,
                     "last_uploaded_video": title,
                     "last_uploaded_at": now_iso

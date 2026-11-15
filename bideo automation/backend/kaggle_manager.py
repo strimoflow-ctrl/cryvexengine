@@ -14,6 +14,13 @@ FIREBASE_DB_URL = os.environ.get(
 FIREBASE_ROOT = "bideo_automation"
 
 
+CHANNEL_SLUG_MAP = {
+    "6ada0b9dfb39968c7c48dd7b": "bideo-engine-cryvex",
+    "6ad9f679fb39968c7c37f8b5": "bideo-engine-pankaj",
+    "6ae80c2eff1a527964fd12b8": "bideo-engine-hariom"
+}
+
+
 class KaggleManager:
     """
     Manages 24/7 Autonomous Kaggle Cloud Worker Sessions for Bideo Automation.
@@ -23,6 +30,14 @@ class KaggleManager:
     _supervisor_thread = None
     _supervisor_running = False
     _last_push_time = 0
+
+    @classmethod
+    def get_slug_for_account(cls, bideo_user_id, default_slug="bideo-automation-engine"):
+        if bideo_user_id in CHANNEL_SLUG_MAP:
+            return CHANNEL_SLUG_MAP[bideo_user_id]
+        if bideo_user_id:
+            return f"bideo-engine-{bideo_user_id[:6]}"
+        return default_slug
 
     @classmethod
     def get_config(cls):
@@ -55,10 +70,10 @@ class KaggleManager:
             return {}
 
     @classmethod
-    def compile_notebook_json(cls):
+    def compile_notebook_json(cls, target_bideo_user_id=None):
         """
         Reads kaggle_cells (cell1_setup.py, cell2_engine.py)
-        Injects cookies and Firebase configuration.
+        Injects cookies, Firebase configuration, and target channel id.
         Returns Jupyter Notebook JSON string ready for Kaggle API push.
         """
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -106,15 +121,18 @@ class KaggleManager:
                 c2_content = f.read()
 
             # Ensure Firebase URL is dynamically injected
-            inject_header = (
-                f"FIREBASE_DB_URL = \"{FIREBASE_DB_URL}\"\n"
-                f"FIREBASE_ROOT = \"{FIREBASE_ROOT}\"\n"
-            )
             c2_content = re.sub(
                 r'FIREBASE_DB_URL\s*=\s*".*?"',
                 f'FIREBASE_DB_URL = "{FIREBASE_DB_URL}"',
                 c2_content
             )
+
+            if target_bideo_user_id:
+                c2_content = re.sub(
+                    r'TARGET_BIDEO_USER_ID\s*=\s*".*?"',
+                    f'TARGET_BIDEO_USER_ID = "{target_bideo_user_id}"',
+                    c2_content
+                )
 
             cells.append({
                 "cell_type": "code",
@@ -139,10 +157,13 @@ class KaggleManager:
         return json.dumps(notebook)
 
     @classmethod
-    def push_kernel(cls, kaggle_user, kaggle_key, kaggle_slug="bideo-automation-engine"):
+    def push_kernel(cls, kaggle_user, kaggle_key, kaggle_slug=None, target_bideo_user_id=None):
         """Pushes compiled notebook to Kaggle API to launch execution."""
         cls._last_push_time = time.time()
-        notebook_code = cls.compile_notebook_json()
+        if not kaggle_slug or kaggle_slug == "bideo-automation-engine":
+            kaggle_slug = cls.get_slug_for_account(target_bideo_user_id, "bideo-automation-engine")
+
+        notebook_code = cls.compile_notebook_json(target_bideo_user_id=target_bideo_user_id)
         credentials = base64.b64encode(f"{kaggle_user}:{kaggle_key}".encode()).decode("utf-8")
         headers = {
             "Authorization": f"Basic {credentials}",
@@ -150,10 +171,12 @@ class KaggleManager:
         }
 
         full_slug = f"{kaggle_user}/{kaggle_slug}"
+        kernel_title = kaggle_slug.replace("-", " ").title()
         payload = {
             "id": None,
             "slug": full_slug,
-            "title": kaggle_slug.replace("-", " ").title(),
+            "title": kernel_title,
+            "newTitle": kernel_title,
             "text": notebook_code,
             "language": "python",
             "kernelType": "notebook",
@@ -168,11 +191,12 @@ class KaggleManager:
         url = "https://www.kaggle.com/api/v1/kernels/push"
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=35)
-            if resp.status_code == 200:
-                print(f"[Kaggle Manager] Kernel '{full_slug}' launched successfully!")
+            data = resp.json() if resp.text else {}
+            if resp.status_code == 200 and not data.get("hasError"):
+                print(f"[Kaggle Manager] Kernel '{full_slug}' launched successfully! URL: {data.get('url')}")
                 return True, "Kaggle Job Launched Successfully!"
             else:
-                err = resp.text
+                err = data.get("error") or data.get("message") or resp.text
                 print(f"[Kaggle Manager] Push failed ({resp.status_code}): {err}")
                 return False, err
         except Exception as e:

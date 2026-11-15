@@ -1,12 +1,16 @@
 import os
 import sys
 import threading
+import logging
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from bot_engine import BotEngine, AutoCoinMiner, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE, DEFAULT_USER_AGENT
 from farming_engine import AutonomousFarmEngine
 from view_limit_manager import ViewLimitManager
 import requests
+
+# Silence noisy HTTP access logs from Werkzeug so the terminal remains 100% clean and clear
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 if sys.platform == "win32":
     try:
@@ -366,6 +370,38 @@ def toggle_view_channel(channel_id):
         ok, res = mgr.update_channel(channel_id, enabled=new_val)
         summary = mgr.get_all_channels_summary()
         return jsonify({"success": True, "message": "Status updated!", "data": res, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/global", methods=["POST"])
+def update_global_views():
+    """Updates master 24h view budget and ON/OFF switch."""
+    body = request.get_json() or {}
+    daily_limit = body.get("daily_limit")
+    enabled = body.get("enabled")
+
+    try:
+        mgr = ViewLimitManager.get_instance()
+        res = mgr.update_global_config(enabled=enabled, daily_limit=daily_limit)
+        summary = mgr.get_all_channels_summary()
+        return jsonify({"success": True, "message": "Global view settings saved!", "data": res, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/global/toggle", methods=["POST"])
+def toggle_global_views():
+    """Toggles master view engine switch ON/OFF."""
+    body = request.get_json() or {}
+    enabled = body.get("enabled")
+
+    try:
+        mgr = ViewLimitManager.get_instance()
+        new_val = (not mgr.is_global_enabled()) if enabled is None else bool(enabled)
+        res = mgr.update_global_config(enabled=new_val)
+        summary = mgr.get_all_channels_summary()
+        return jsonify({"success": True, "message": "Global switch updated!", "data": res, **summary})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 

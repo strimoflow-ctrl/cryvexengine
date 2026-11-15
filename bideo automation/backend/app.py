@@ -289,6 +289,35 @@ def get_channel_videos_route(channel_id):
     return jsonify({"success": True, "videos": videos})
 
 
+@app.route("/api/channels/<channel_id>", methods=["DELETE"])
+def delete_channel_route(channel_id):
+    """Deletes a saved YouTube channel and its videos from library."""
+    try:
+        ok = FirebaseClient.delete_channel(channel_id)
+        if ok:
+            return jsonify({"success": True, "message": "Channel successfully library se delete ho gaya!"})
+        return jsonify({"success": False, "message": "Channel delete nahi ho saka"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/channels/<channel_id>/rename", methods=["PATCH"])
+def rename_channel_route(channel_id):
+    """Renames a saved YouTube channel in library."""
+    try:
+        data = request.get_json() or {}
+        new_name = data.get("channel_name", "").strip()
+        if not new_name:
+            return jsonify({"success": False, "message": "Channel ka naya naam zaroori hai!"}), 400
+
+        ok = FirebaseClient.rename_channel(channel_id, new_name)
+        if ok:
+            return jsonify({"success": True, "channel_name": new_name, "message": "Channel successfully rename ho gaya!"})
+        return jsonify({"success": False, "message": "Channel rename nahi ho saka"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/batch/start", methods=["POST"])
 def batch_start():
     """
@@ -328,14 +357,18 @@ def batch_start():
         "videos": selected_videos
     }
 
-    # Save batch in Firebase
+    # Save batch in Firebase both under global active_batch and channel-scoped active_batches/<bideo_user_id>
     FirebaseClient.save_active_batch(batch_data)
+    try:
+        requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/active_batches/{bideo_user_id}.json", json=batch_data, timeout=8)
+    except Exception:
+        pass
 
-    # Launch Kaggle on-demand bot
+    # Launch Kaggle on-demand bot with channel-specific slug (allowing 3 parallel bots)
     config = KaggleManager.get_config()
     user = config.get("kaggle_user")
     key = config.get("kaggle_key")
-    slug = config.get("kaggle_slug", "bideo-automation-engine")
+    slug = KaggleManager.get_slug_for_account(bideo_user_id, config.get("kaggle_slug", "bideo-automation-engine"))
 
     if not user or not key:
         return jsonify({
@@ -343,23 +376,23 @@ def batch_start():
             "message": "Kaggle API Key configured nahi hai! Pehle Kaggle Settings me setup karein."
         }), 400
 
-    ok, msg = KaggleManager.push_kernel(user, key, slug)
+    ok, msg = KaggleManager.push_kernel(user, key, kaggle_slug=slug, target_bideo_user_id=bideo_user_id)
     if ok:
         try:
-            requests.put(
-                f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
-                json={
-                    "is_running": False,
-                    "state": "waiting_boot",
-                    "launched_at": datetime.now().isoformat(),
-                    "last_heartbeat": 0,
-                    "batch_id": batch_id,
-                    "total_videos": len(selected_videos),
-                    "current_task": f"Kaggle Bot launched! Pre-downloading {len(selected_videos)} videos...",
-                    "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
-                },
-                timeout=5
-            )
+            status_payload = {
+                "is_running": False,
+                "state": "waiting_boot",
+                "launched_at": datetime.now().isoformat(),
+                "last_heartbeat": 0,
+                "batch_id": batch_id,
+                "bideo_user_id": bideo_user_id,
+                "channel_name": bideo_acc.get("name") or bideo_acc.get("channelName"),
+                "total_videos": len(selected_videos),
+                "current_task": f"Kaggle Bot launched for {bideo_acc.get('name')}! Pre-downloading {len(selected_videos)} videos...",
+                "kaggle_url": f"https://www.kaggle.com/code/{user}/{slug}"
+            }
+            requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json", json=status_payload, timeout=5)
+            requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status_{bideo_user_id}.json", json=status_payload, timeout=5)
         except Exception:
             pass
 
@@ -382,9 +415,28 @@ def batch_start():
 
 @app.route("/api/batch/status", methods=["GET"])
 def batch_status():
-    """Returns active batch details & Kaggle live progress."""
-    batch = FirebaseClient.get_active_batch()
-    status = KaggleManager.get_status()
+    """Returns active batch details & Kaggle live progress per channel."""
+    bideo_user_id = request.args.get("bideo_user_id")
+    batch = None
+    if bideo_user_id:
+        try:
+            r = requests.get(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/active_batches/{bideo_user_id}.json", timeout=5)
+            batch = r.json()
+        except Exception:
+            pass
+    if not batch:
+        batch = FirebaseClient.get_active_batch()
+
+    status = None
+    if bideo_user_id:
+        try:
+            r = requests.get(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status_{bideo_user_id}.json", timeout=5)
+            status = r.json()
+        except Exception:
+            pass
+    if not status:
+        status = KaggleManager.get_status()
+
     return jsonify({
         "success": True,
         "batch": batch,
@@ -394,26 +446,34 @@ def batch_status():
 
 @app.route("/api/batch/cancel", methods=["POST"])
 def batch_cancel():
-    """Cancels active batch and stops running Kaggle session."""
+    """Cancels active batch and stops running Kaggle session for target channel."""
+    data = request.get_json() or {}
+    bideo_user_id = data.get("bideo_user_id")
+    if bideo_user_id:
+        try:
+            requests.delete(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/active_batches/{bideo_user_id}.json", timeout=5)
+        except Exception:
+            pass
+
     FirebaseClient.clear_active_batch()
     config = KaggleManager.get_config()
     user = config.get("kaggle_user")
     key = config.get("kaggle_key")
-    slug = config.get("kaggle_slug", "bideo-automation-engine")
+    slug = KaggleManager.get_slug_for_account(bideo_user_id, config.get("kaggle_slug", "bideo-automation-engine"))
+
     if user and key:
         KaggleManager.cancel_kernel(user, key, slug)
 
     try:
-        requests.put(
-            f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json",
-            json={
-                "is_running": False,
-                "state": "stopped",
-                "current_task": "Batch cancelled by user",
-                "last_heartbeat": time.time()
-            },
-            timeout=5
-        )
+        status_payload = {
+            "is_running": False,
+            "state": "stopped",
+            "current_task": "Batch cancelled by user",
+            "last_heartbeat": time.time()
+        }
+        requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status.json", json=status_payload, timeout=5)
+        if bideo_user_id:
+            requests.put(f"{FIREBASE_DB_URL}/{FIREBASE_ROOT}/kaggle_status_{bideo_user_id}.json", json=status_payload, timeout=5)
     except Exception:
         pass
 
@@ -686,7 +746,9 @@ def upload_single_url():
                 description=description,
                 category_id=category_id,
                 is_short=is_short,
-                meta=meta
+                meta=meta,
+                phone=account.get("phone"),
+                password=account.get("password")
             )
 
             if not success:
@@ -779,6 +841,12 @@ def upload_to_channel():
         # Clean token
         token_str = auth_header.replace("Bearer ", "").strip()
 
+        # Find matching account for auto-session recovery
+        all_accs = FirebaseClient.get_accounts()
+        matched_acc = next((a for a in all_accs if a.get("token") == token_str or a.get("_id") == request.form.get("accountId")), None)
+        phone = matched_acc.get("phone") if matched_acc else None
+        password = matched_acc.get("password") if matched_acc else None
+
         success, video_data, err_msg = BideoClient.upload_video(
             token=token_str,
             video_path=temp_video_path,
@@ -787,7 +855,9 @@ def upload_to_channel():
             description=description,
             category_id=category_id,
             is_short=is_short,
-            meta=meta
+            meta=meta,
+            phone=phone,
+            password=password
         )
 
         if not success:

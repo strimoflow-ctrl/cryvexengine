@@ -371,14 +371,30 @@ class AutonomousFarmEngine:
         # Stagger worker starts
         time.sleep(worker_id * 6)
         local_ratio_counter = 0
+        last_standby_log_time = 0
+
         while self.running:
             try:
-                # 1. Check if any channels have remaining 24H view budget
+                # 1. Master Global Check: Is view engine allowed to operate?
+                g_allowed, g_msg, total_views, g_limit = self.view_limit_mgr.is_viewing_allowed_globally()
+
+                if not g_allowed:
+                    # View bot is paused or global 24h budget reached!
+                    # "views wala bot band ho jaye apne app okk"
+                    self.state["current_mode"] = f"Standby: {g_msg}"
+                    now = time.time()
+                    if now - last_standby_log_time > 300:  # Log once every 5 minutes at most, keeping terminal 100% clean
+                        self._log("Views Standby", f"💤 View bot asleep: {g_msg} (Total 24h: {total_views}/{g_limit})", "info")
+                        last_standby_log_time = now
+                    time.sleep(25)
+                    continue
+
+                # 2. Check if any channels have remaining 24H view budget
                 eligible_channels = self.view_limit_mgr.get_eligible_channels()
 
                 if eligible_channels:
                     self.state["current_mode"] = "Target Channel Views"
-                    # Periodically (1 in 6 times) perform stealth browsing for human-like profile
+                    # Periodically perform stealth browsing for human-like profile (if global limit has room)
                     if local_ratio_counter < 5 or random.random() < 0.85:
                         delivered = self._execute_channel_view(eligible_channels, worker_id)
                         if delivered:
@@ -390,17 +406,29 @@ class AutonomousFarmEngine:
                             time.sleep(10)
                     else:
                         # Occasional organic stealth browse
-                        self._execute_stealth_browsing()
+                        self._execute_stealth_browsing(is_idle_fallback=False)
                         local_ratio_counter = 0
                         delay = random.randint(20, 32)
                         time.sleep(delay)
                 else:
                     # ALL CHANNELS COMPLETED OR PAUSED!
-                    # Free bots execute organic explore browsing and like videos
-                    self.state["current_mode"] = "Organic Stealth Browsing (All 24H Targets Met)"
-                    self._execute_stealth_browsing(is_idle_fallback=True)
-                    delay = random.randint(20, 35)
-                    time.sleep(delay)
+                    # Check if global limit has reached or still has room
+                    curr_total = self.view_limit_mgr.get_total_views_24h()
+                    if g_limit > 0 and curr_total >= g_limit:
+                        # All channels target complete AND global target complete!
+                        # "sare channel ka target complite ho gya h ur globel ka bhi to views wala bot band ho jaye apne app"
+                        self.state["current_mode"] = f"💤 Standby: All Targets & 24H Global Budget Completed ({curr_total}/{g_limit})"
+                        now = time.time()
+                        if now - last_standby_log_time > 300:
+                            self._log("Views Standby", f"🏁 All channels & global 24h budget completed ({curr_total}/{g_limit}). View bot in standby.", "success")
+                            last_standby_log_time = now
+                        time.sleep(30)
+                    else:
+                        # Free bots can browse public explore feed & like videos until global limit is reached
+                        self.state["current_mode"] = f"Organic Stealth Browsing ({curr_total}/{g_limit} Global Views)"
+                        self._execute_stealth_browsing(is_idle_fallback=True)
+                        delay = random.randint(25, 40)
+                        time.sleep(delay)
 
             except Exception as e:
                 self._log(f"Farming Loop W{worker_id} Error", str(e), "error")
@@ -526,7 +554,7 @@ class AutonomousFarmEngine:
                 return
             public_videos = r.json().get("data", [])
             # Exclude all configured target channels
-            managed_ids = set(self.view_limit_mgr.data.keys())
+            managed_ids = set(k for k in self.view_limit_mgr.data.keys() if k != "_global")
             others = [v for v in public_videos if (v.get("owner") or {}).get("_id") not in managed_ids]
             if not others:
                 others = public_videos
@@ -553,8 +581,13 @@ class AutonomousFarmEngine:
             requests.post(f"https://bideo.in/api/videos/{vid_id}/watch-time", headers=headers, json={"watchTime": watch_seconds}, timeout=6)
             self.state["stealth_views_today"] += 1
 
-            reason_str = "All 24H Targets Met" if is_idle_fallback else "Organic Warming"
-            stealth_action = f"Browsed public feed ({reason_str}) -> Watched '{creator_name}' ({watch_seconds}s)"
+            # Record stealth view in ViewLimitManager
+            self.view_limit_mgr.record_stealth_view(video_id=vid_id, creator=creator_name)
+            curr_global_views = self.view_limit_mgr.get_total_views_24h()
+            curr_global_limit = self.view_limit_mgr.get_global_limit()
+
+            reason_str = "All Channel Targets Met" if is_idle_fallback else "Organic Warming"
+            stealth_action = f"Browsed public feed ({reason_str}) -> Watched '{creator_name}' ({watch_seconds}s) [{curr_global_views}/{curr_global_limit} Global Views]"
 
             # Higher like probability when bots are free/idle (35%), normal (20%)
             like_prob = 0.35 if is_idle_fallback else self.stealth_like_chance

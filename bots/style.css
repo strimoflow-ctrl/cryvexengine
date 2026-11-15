@@ -2724,6 +2724,157 @@ body.cyber-theme {
   margin-bottom: 2px;
 }
 
+/* ============================================================= */
+/* MASTER GLOBAL 24H VIEW CONTROLLER STYLES                      */
+/* ============================================================= */
+.global-view-controller-card {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(15, 23, 42, 0.88) 100%);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 25px rgba(6, 182, 212, 0.12);
+}
+
+.global-ctrl-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 16px;
+}
+
+.global-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-core-icon {
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px #06B6D4);
+}
+
+.global-title-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #38BDF8;
+  display: block;
+}
+
+.global-sub-text {
+  font-size: 11.5px;
+  color: #94A3B8;
+  display: block;
+  margin-top: 2px;
+}
+
+.global-switch-col {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch-helper-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #10B981;
+  letter-spacing: 0.5px;
+}
+
+.switch-helper-text.off {
+  color: #EF4444;
+}
+
+.master-cyber-switch {
+  width: 52px;
+  height: 26px;
+}
+
+.master-cyber-switch .cyber-slider:before {
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 3px;
+}
+
+.master-cyber-switch input:checked + .cyber-slider:before {
+  transform: translateX(26px);
+}
+
+.global-ctrl-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.global-limit-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.global-input-box {
+  padding: 4px 10px;
+}
+
+.global-progress-col {
+  flex: 2;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.global-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+}
+
+.progress-info-txt {
+  color: #F8FAFC;
+  font-weight: 700;
+}
+
+.sub-stat-pills {
+  color: #64748B;
+  font-size: 10px;
+}
+
+.global-track {
+  height: 9px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.global-badge {
+  font-size: 11px;
+  padding: 6px 14px;
+  min-width: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctrl-status-badge.standby {
+  background: rgba(168, 85, 247, 0.15);
+  color: #C084FC;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
 
 
 

@@ -23,8 +23,11 @@ class FirebaseClient:
     # -------------------------------------------------------------
     # Bideo Accounts Management
     # -------------------------------------------------------------
+    MAIN_PHONES = {"7052733069", "9115233706", "9648083419"}
+    ORDER_MAP = {"7052733069": 0, "9115233706": 1, "9648083419": 2}
+
     @classmethod
-    def save_account(cls, user_data, token, phone):
+    def save_account(cls, user_data, token, phone, password=None):
         """Save or update logged-in Bideo account."""
         user_id = user_data.get("_id") or user_data.get("id")
         if not user_id:
@@ -32,14 +35,21 @@ class FirebaseClient:
 
         record = {
             "_id": user_id,
+            "id": user_id,
+            "user_id": user_id,
             "name": user_data.get("name", "Channel"),
             "avatar": user_data.get("avatar", ""),
             "channelName": user_data.get("channelName", ""),
             "followersCount": user_data.get("followersCount", 0),
-            "phone": phone,
+            "coins": user_data.get("coins", 0),
+            "walletBalance": user_data.get("walletBalance", 0),
+            "phone": str(phone).strip(),
             "token": token,
+            "status": "active",
             "updatedAt": datetime.utcnow().isoformat()
         }
+        if password:
+            record["password"] = password
 
         try:
             r = requests.put(cls._url(f"accounts/{user_id}"), json=record, timeout=8)
@@ -49,13 +59,17 @@ class FirebaseClient:
             return False
 
     @classmethod
-    def get_accounts(cls):
-        """Fetch all saved Bideo accounts."""
+    def get_accounts(cls, only_main=True):
+        """Fetch saved Bideo accounts (strictly filters to only the 3 main accounts)."""
         try:
             r = requests.get(cls._url("accounts"), timeout=8)
             data = r.json()
             if isinstance(data, dict):
-                return list(data.values())
+                accs = list(data.values())
+                if only_main:
+                    accs = [a for a in accs if str(a.get("phone", "")).strip() in cls.MAIN_PHONES]
+                accs.sort(key=lambda a: cls.ORDER_MAP.get(str(a.get("phone", "")).strip(), 99))
+                return accs
             return []
         except Exception as e:
             print(f"[Firebase Warning] get_accounts error: {e}")
@@ -63,9 +77,21 @@ class FirebaseClient:
 
     @classmethod
     def get_account_by_id(cls, user_id):
+        """Fetch account by ID and ensure token is fresh/active."""
         try:
             r = requests.get(cls._url(f"accounts/{user_id}"), timeout=8)
-            return r.json()
+            acc = r.json()
+            if acc and isinstance(acc, dict):
+                from bideo_client import BideoClient
+                token = acc.get("token")
+                profile = BideoClient.get_user_profile(token) if token else None
+                if not profile and acc.get("phone") and acc.get("password"):
+                    print(f"[FirebaseClient] Auto-refreshing expired token for {acc.get('name')} ({acc.get('phone')})...")
+                    ok, new_tok, user_info, _ = BideoClient.login(acc["phone"], acc["password"])
+                    if ok and new_tok:
+                        acc["token"] = new_tok
+                        cls.save_account(user_info or acc, new_tok, acc["phone"], acc["password"])
+            return acc
         except Exception:
             return None
 
@@ -326,6 +352,27 @@ class FirebaseClient:
         except Exception as e:
             print(f"[Firebase Warning] get_channel_videos error: {e}")
             return []
+
+    @classmethod
+    def delete_channel(cls, ch_id):
+        """Deletes a channel and all its stored videos from Firebase."""
+        try:
+            r = requests.delete(cls._url(f"channels/{ch_id}"), timeout=8)
+            return r.ok
+        except Exception as e:
+            print(f"[Firebase Warning] delete_channel error: {e}")
+            return False
+
+    @classmethod
+    def rename_channel(cls, ch_id, new_name):
+        """Renames a saved channel in Firebase."""
+        try:
+            clean_name = str(new_name).strip()
+            r = requests.patch(cls._url(f"channels/{ch_id}"), json={"channel_name": clean_name}, timeout=8)
+            return r.ok
+        except Exception as e:
+            print(f"[Firebase Warning] rename_channel error: {e}")
+            return False
 
     @classmethod
     def mark_video_uploaded_in_channel(cls, ch_id, vid_id, bideo_video_id, title=""):

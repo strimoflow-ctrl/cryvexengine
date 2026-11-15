@@ -241,11 +241,21 @@
               </div>
             </div>
 
-            <!-- SAVED CHANNELS DROPDOWN -->
-            <div style="flex: 1; min-width: 240px;">
-              <label for="savedChannelsSelect" style="font-size: 0.88rem; font-weight: 600; color: #f1f5f9; display: block; margin-bottom: 6px;">
-                📁 Stored Channels Library (Firebase)
-              </label>
+            <!-- SAVED CHANNELS DROPDOWN WITH RENAME & DELETE -->
+            <div style="flex: 1.2; min-width: 280px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="savedChannelsSelect" style="font-size: 0.88rem; font-weight: 600; color: #f1f5f9; margin: 0;">
+                  📁 Stored Channels Library
+                </label>
+                <div style="display: flex; gap: 6px;">
+                  <button type="button" id="renameChannelBtn" class="btn btn-secondary" title="Selected channel ko rename karein" style="padding: 4px 10px; font-size: 0.76rem; border-radius: 6px;" disabled>
+                    ✏️ Rename
+                  </button>
+                  <button type="button" id="deleteChannelBtn" class="btn btn-secondary" title="Selected channel ko delete karein" style="padding: 4px 10px; font-size: 0.76rem; border-radius: 6px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" disabled>
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
               <select id="savedChannelsSelect" style="width: 100%; padding: 10px 14px; font-size: 0.9rem;">
                 <option value="">Select a previously saved channel...</option>
               </select>
@@ -263,11 +273,17 @@
           <!-- CHANNEL INFO & QUICK ACTIONS HEADER -->
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);">
             <div>
-              <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <h3 id="currentChannelTitle" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #fff;">Select or Fetch a Channel</h3>
                 <a id="currentChannelLink" href="#" target="_blank" class="hidden" style="color: #38bdf8; font-size: 0.82rem; text-decoration: underline;">
                   View on YouTube ↗
                 </a>
+                <button type="button" id="headerRenameChannelBtn" class="btn btn-secondary btn-sm" title="Active channel ko rename karein" style="font-size: 0.76rem; padding: 3px 10px; border-radius: 6px;">
+                  ✏️ Rename
+                </button>
+                <button type="button" id="headerDeleteChannelBtn" class="btn btn-secondary btn-sm" title="Active channel ko library se delete karein" style="font-size: 0.76rem; padding: 3px 10px; border-radius: 6px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
+                  🗑️ Delete
+                </button>
               </div>
               <div id="channelStatsPills" style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
                 <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -344,6 +360,9 @@
                   </label>
                   <select id="batchBideoAccountSelect" style="width: 100%; padding: 8px 12px; font-size: 0.85rem;">
                     <option value="">Select Bideo Account...</option>
+                    <option value="6ada0b9dfb39968c7c48dd7b">cryvex (@Cryvex)</option>
+                    <option value="6ad9f679fb39968c7c37f8b5">pankaj_bideo (@Pankaz)</option>
+                    <option value="6ae80c2eff1a527964fd12b8">hariom_ai (@Hariom ai)</option>
                   </select>
                 </div>
 
@@ -353,6 +372,17 @@
                   </label>
                   <select id="batchCategorySelect" style="width: 100%; padding: 8px 12px; font-size: 0.85rem;">
                     <option value="">Select Category...</option>
+                    <option value="6a2f13458b8b9c8e631b188a">Comedy</option>
+                    <option value="6a7c8fbab377a28c2a051a7e">Education</option>
+                    <option value="6a1c0373fc86d90963e20ae8">Entertainment</option>
+                    <option value="6a12f4d6c69d0eddde28b4ad">Food</option>
+                    <option value="6a1c03a2fc86d90963e20ae9">Gaming</option>
+                    <option value="6ab55282bbaabc57e22b9f62">Health & Fitness</option>
+                    <option value="6a1c03e5fc86d90963e20aea">Music</option>
+                    <option value="6a08764d700dc1864041ac6c">News</option>
+                    <option value="6ab5528ebbaabc57e22ba002">Sports</option>
+                    <option value="6a1c036cfc86d90963e20ae7">Tech</option>
+                    <option value="6a1c0364fc86d90963e20ae6">Vlogs</option>
                   </select>
                 </div>
 
@@ -788,6 +818,6 @@
 
   </div>
 
-  <script src="app.js?v=3.1"></script>
+  <script src="app.js?v=3.2"></script>
 </body>
 </html>

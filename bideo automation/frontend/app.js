@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentActiveAccount = null;
   let allCategories = [];
   let selectedVideoFile = null;
+  let populateBatchDropdowns = null;
 
   // -----------------------------------------------------------
   // Tab Switching
@@ -270,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial Auth & Account Loading
   // -----------------------------------------------------------
   async function initApp() {
+    loadCategories();
     await loadAccounts();
 
     if (savedAccounts.length > 0) {
@@ -298,14 +300,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const MAIN_ACCOUNT_IDS = new Set([
+    '6ada0b9dfb39968c7c48dd7b',
+    '6ad9f679fb39968c7c37f8b5',
+    '6ae80c2eff1a527964fd12b8'
+  ]);
+  const MAIN_ACCOUNT_PHONES = new Set(['7052733069', '9115233706', '9648083419']);
+
   async function loadAccounts() {
     try {
       const res = await fetch('/api/accounts');
       const data = await res.json();
-      if (data.success && data.accounts) {
-        savedAccounts = data.accounts;
+      if (data.success && Array.isArray(data.accounts)) {
+        savedAccounts = data.accounts.filter(a => {
+          const ph = String(a.phone || '').trim();
+          const uid = String(a._id || a.id || '').trim();
+          return MAIN_ACCOUNT_PHONES.has(ph) || MAIN_ACCOUNT_IDS.has(uid);
+        });
         renderAccountDropdown();
         populatePairingAccountSelect();
+        if (typeof populateBatchDropdowns === 'function') {
+          populateBatchDropdowns();
+        }
       }
     } catch (e) {
       console.warn('Could not load accounts from Firebase:', e);
@@ -446,56 +462,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  const DEFAULT_BIDEO_CATEGORIES = [
+    { _id: '6a2f13458b8b9c8e631b188a', name: 'Comedy', videosCount: 39148 },
+    { _id: '6a7c8fbab377a28c2a051a7e', name: 'Education', videosCount: 5000 },
+    { _id: '6a1c0373fc86d90963e20ae8', name: 'Entertainment', videosCount: 20000 },
+    { _id: '6a12f4d6c69d0eddde28b4ad', name: 'Food', videosCount: 4500 },
+    { _id: '6a1c03a2fc86d90963e20ae9', name: 'Gaming', videosCount: 12000 },
+    { _id: '6ab55282bbaabc57e22b9f62', name: 'Health & Fitness', videosCount: 3500 },
+    { _id: '6a1c03e5fc86d90963e20aea', name: 'Music', videosCount: 18000 },
+    { _id: '6a08764d700dc1864041ac6c', name: 'News', videosCount: 6000 },
+    { _id: '6ab5528ebbaabc57e22ba002', name: 'Sports', videosCount: 8500 },
+    { _id: '6a1c036cfc86d90963e20ae7', name: 'Tech', videosCount: 15000 },
+    { _id: '6a1c0364fc86d90963e20ae6', name: 'Vlogs', videosCount: 14000 }
+  ];
+
   // -----------------------------------------------------------
-  // Categories Loader
+  // Categories Loader & Dropdown Populator
   // -----------------------------------------------------------
+  function populateAllCategoryDropdowns() {
+    const cats = (allCategories && allCategories.length > 0) ? allCategories : DEFAULT_BIDEO_CATEGORIES;
+
+    if (categorySelect) categorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
+    if (pairingCategorySelect) pairingCategorySelect.innerHTML = '<option value="">-- Default Category Chunein (Optional) --</option>';
+    if (singleCategorySelect) singleCategorySelect.innerHTML = '<option value="">-- Category Chunein (Optional) --</option>';
+    const batchCatSelect = document.getElementById('batchCategorySelect');
+    if (batchCatSelect) batchCatSelect.innerHTML = '<option value="">Select Category...</option>';
+
+    cats.forEach(cat => {
+      const catId = cat._id || cat.id;
+      const catName = (cat.name || '').trim();
+
+      if (categorySelect) {
+        const opt1 = document.createElement('option');
+        opt1.value = catId;
+        opt1.textContent = `${catName} (${cat.videosCount || 0} videos)`;
+        categorySelect.appendChild(opt1);
+      }
+
+      if (pairingCategorySelect) {
+        const opt2 = document.createElement('option');
+        opt2.value = catId;
+        opt2.textContent = catName;
+        pairingCategorySelect.appendChild(opt2);
+      }
+
+      if (singleCategorySelect) {
+        const opt3 = document.createElement('option');
+        opt3.value = catId;
+        opt3.textContent = catName;
+        singleCategorySelect.appendChild(opt3);
+      }
+
+      if (batchCatSelect) {
+        const opt4 = document.createElement('option');
+        opt4.value = catId;
+        opt4.textContent = catName;
+        batchCatSelect.appendChild(opt4);
+      }
+    });
+  }
+
   async function loadCategories() {
     try {
       const res = await fetch('/api/categories');
       const data = await res.json();
-
-      if (data.success && data.categories) {
+      if (data.success && Array.isArray(data.categories) && data.categories.length > 0) {
         allCategories = data.categories;
-
-        // Populate manual upload select
-        if (categorySelect) categorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
-        if (pairingCategorySelect) pairingCategorySelect.innerHTML = '<option value="">-- Default Category Chunein (Optional) --</option>';
-        if (singleCategorySelect) singleCategorySelect.innerHTML = '<option value="">-- Category Chunein (Optional) --</option>';
-        const batchCatSelect = document.getElementById('batchCategorySelect');
-        if (batchCatSelect) batchCatSelect.innerHTML = '<option value="">Select Category...</option>';
-
-        data.categories.forEach(cat => {
-          if (categorySelect) {
-            const opt1 = document.createElement('option');
-            opt1.value = cat._id || cat.id;
-            opt1.textContent = `${cat.name} (${cat.videosCount || 0} videos)`;
-            categorySelect.appendChild(opt1);
-          }
-
-          if (pairingCategorySelect) {
-            const opt2 = document.createElement('option');
-            opt2.value = cat._id || cat.id;
-            opt2.textContent = cat.name;
-            pairingCategorySelect.appendChild(opt2);
-          }
-
-          if (singleCategorySelect) {
-            const opt3 = document.createElement('option');
-            opt3.value = cat._id || cat.id;
-            opt3.textContent = cat.name;
-            singleCategorySelect.appendChild(opt3);
-          }
-
-          if (batchCatSelect) {
-            const opt4 = document.createElement('option');
-            opt4.value = cat._id || cat.id;
-            opt4.textContent = cat.name;
-            batchCatSelect.appendChild(opt4);
-          }
-        });
+      } else {
+        allCategories = DEFAULT_BIDEO_CATEGORIES;
       }
     } catch (e) {
-      console.warn('Could not load categories:', e);
+      console.warn('Using default categories due to fetch error:', e);
+      allCategories = DEFAULT_BIDEO_CATEGORIES;
+    }
+    populateAllCategoryDropdowns();
+    if (typeof populateBatchDropdowns === 'function') {
+      populateBatchDropdowns();
     }
   }
 
@@ -1493,6 +1535,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const channelFetchInput = document.getElementById('channelFetchInput');
     const fetchChannelBtn = document.getElementById('fetchChannelBtn');
     const savedChannelsSelect = document.getElementById('savedChannelsSelect');
+    const renameChannelBtn = document.getElementById('renameChannelBtn');
+    const deleteChannelBtn = document.getElementById('deleteChannelBtn');
+    const headerRenameChannelBtn = document.getElementById('headerRenameChannelBtn');
+    const headerDeleteChannelBtn = document.getElementById('headerDeleteChannelBtn');
     const channelFetchAlert = document.getElementById('channelFetchAlert');
 
     const currentChannelTitle = document.getElementById('currentChannelTitle');
@@ -1500,6 +1546,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const statTotalVids = document.getElementById('statTotalVids');
     const statUploadedVids = document.getElementById('statUploadedVids');
     const statAvailableVids = document.getElementById('statAvailableVids');
+
+    function updateChannelActionButtons() {
+      const hasSelected = !!(savedChannelsSelect && savedChannelsSelect.value) || !!(studioCurrentChannel && studioCurrentChannel.id);
+      if (renameChannelBtn) renameChannelBtn.disabled = !hasSelected;
+      if (deleteChannelBtn) deleteChannelBtn.disabled = !hasSelected;
+      if (headerRenameChannelBtn) headerRenameChannelBtn.style.display = hasSelected ? 'inline-flex' : 'none';
+      if (headerDeleteChannelBtn) headerDeleteChannelBtn.style.display = hasSelected ? 'inline-flex' : 'none';
+    }
 
     const filterAvailableBtn = document.getElementById('filterAvailableBtn');
     const filterUploadedBtn = document.getElementById('filterUploadedBtn');
@@ -1520,14 +1574,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBatchUploadBtn = document.getElementById('startBatchUploadBtn');
     const cancelActiveBatchBtn = document.getElementById('cancelActiveBatchBtn');
 
-    // Populate Bideo accounts in Batch Select
-    function populateBatchDropdowns() {
+    // Populate Bideo accounts and Categories in Batch Select
+    populateBatchDropdowns = function() {
       if (batchBideoAccountSelect) {
         batchBideoAccountSelect.innerHTML = '<option value="">Select Bideo Account...</option>';
-        savedAccounts.forEach(acc => {
+        const accountsToUse = (savedAccounts && savedAccounts.length > 0) ? savedAccounts : [
+          { _id: '6ada0b9dfb39968c7c48dd7b', name: 'cryvex', channelName: 'Cryvex', phone: '7052733069' },
+          { _id: '6ad9f679fb39968c7c37f8b5', name: 'pankaj_bideo', channelName: 'Pankaz', phone: '9115233706' },
+          { _id: '6ae80c2eff1a527964fd12b8', name: 'hariom_ai', channelName: 'Hariom ai', phone: '9648083419' }
+        ];
+        accountsToUse.forEach(acc => {
           const opt = document.createElement('option');
           opt.value = acc._id || acc.id;
-          opt.textContent = `${acc.name || acc.channelName} (${acc.phone || 'Connected'})`;
+          const chName = acc.channelName ? `@${acc.channelName}` : (acc.phone || '');
+          opt.textContent = `${acc.name || 'Channel'} (${chName})`;
           batchBideoAccountSelect.appendChild(opt);
         });
         if (currentActiveAccount && savedAccounts.length > 0) {
@@ -1537,14 +1597,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (batchCategorySelect) {
         batchCategorySelect.innerHTML = '<option value="">Select Category...</option>';
-        allCategories.forEach(cat => {
+        const cats = (allCategories && allCategories.length > 0) ? allCategories : DEFAULT_BIDEO_CATEGORIES;
+        cats.forEach(cat => {
           const opt = document.createElement('option');
           opt.value = cat._id || cat.id;
-          opt.textContent = cat.name || cat.title;
+          opt.textContent = (cat.name || cat.title || '').trim();
           batchCategorySelect.appendChild(opt);
         });
       }
-    }
+    };
 
     // Load saved channels list from Firebase
     async function loadSavedChannelsList() {
@@ -1563,8 +1624,110 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (err) {
         console.warn('Failed to load saved channels:', err);
+      } finally {
+        updateChannelActionButtons();
       }
     }
+
+    // Rename Saved Channel Handler
+    async function doRenameChannel() {
+      const chId = (savedChannelsSelect && savedChannelsSelect.value) ? savedChannelsSelect.value : (studioCurrentChannel ? studioCurrentChannel.id : null);
+      if (!chId) {
+        alert('Pehle drop-down list se ya channel gallery se koi channel select karein!');
+        return;
+      }
+
+      const selOpt = savedChannelsSelect ? savedChannelsSelect.options[savedChannelsSelect.selectedIndex] : null;
+      const oldName = selOpt ? selOpt.textContent.split('(')[0].trim() : (studioCurrentChannel ? studioCurrentChannel.channel_name : '');
+      const newName = prompt('Channel ka naya naam enter karein:', oldName);
+
+      if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+      if (renameChannelBtn) renameChannelBtn.disabled = true;
+      if (headerRenameChannelBtn) headerRenameChannelBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/channels/${encodeURIComponent(chId)}/rename`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_name: newName.trim() })
+        });
+        const d = await res.json();
+        if (d.success) {
+          if (studioCurrentChannel) studioCurrentChannel.channel_name = newName.trim();
+          if (currentChannelTitle) currentChannelTitle.textContent = newName.trim();
+          await loadSavedChannelsList();
+          if (savedChannelsSelect) savedChannelsSelect.value = chId;
+          updateChannelActionButtons();
+          alert(`✅ Channel ka naam badal kar '${newName.trim()}' kar diya gaya!`);
+        } else {
+          alert(d.message || 'Rename failed');
+        }
+      } catch (err) {
+        alert(`Rename error: ${err.message}`);
+      } finally {
+        if (renameChannelBtn) renameChannelBtn.disabled = false;
+        if (headerRenameChannelBtn) headerRenameChannelBtn.disabled = false;
+        updateChannelActionButtons();
+      }
+    }
+
+    // Delete Saved Channel Handler
+    async function doDeleteChannel() {
+      const chId = (savedChannelsSelect && savedChannelsSelect.value) ? savedChannelsSelect.value : (studioCurrentChannel ? studioCurrentChannel.id : null);
+      if (!chId) {
+        alert('Pehle drop-down list se ya channel gallery se koi channel select karein!');
+        return;
+      }
+
+      const selOpt = savedChannelsSelect ? savedChannelsSelect.options[savedChannelsSelect.selectedIndex] : null;
+      const chName = selOpt ? selOpt.textContent.split('(')[0].trim() : (studioCurrentChannel ? studioCurrentChannel.channel_name : 'ye channel');
+
+      if (!confirm(`⚠️ Kya aap sach me '${chName}' channel aur uski saari videos ko library se delete karna chahte hain?`)) {
+        return;
+      }
+
+      if (deleteChannelBtn) deleteChannelBtn.disabled = true;
+      if (headerDeleteChannelBtn) headerDeleteChannelBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/channels/${encodeURIComponent(chId)}`, {
+          method: 'DELETE'
+        });
+        const d = await res.json();
+        if (d.success) {
+          studioCurrentChannel = null;
+          studioCurrentVideos = [];
+          studioSelectedIds.clear();
+          if (currentChannelTitle) currentChannelTitle.textContent = 'Select or Fetch a Channel';
+          if (currentChannelLink) currentChannelLink.classList.add('hidden');
+          if (statTotalVids) statTotalVids.textContent = '0';
+          if (statUploadedVids) statUploadedVids.textContent = '0';
+          if (statAvailableVids) statAvailableVids.textContent = '0';
+          if (channelVideosGrid) {
+            channelVideosGrid.innerHTML = `
+              <div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center;">
+                <span style="font-size: 2.2rem; display: block; margin-bottom: 12px;">🗑️</span>
+                Channel library se successfully delete kar diya gaya hai.
+              </div>
+            `;
+          }
+          await loadSavedChannelsList();
+          alert(`🗑️ Channel '${chName}' successfully delete ho gaya!`);
+        } else {
+          alert(d.message || 'Delete failed');
+        }
+      } catch (err) {
+        alert(`Delete error: ${err.message}`);
+      } finally {
+        if (deleteChannelBtn) deleteChannelBtn.disabled = false;
+        if (headerDeleteChannelBtn) headerDeleteChannelBtn.disabled = false;
+        updateChannelActionButtons();
+      }
+    }
+
+    if (renameChannelBtn) renameChannelBtn.addEventListener('click', doRenameChannel);
+    if (headerRenameChannelBtn) headerRenameChannelBtn.addEventListener('click', doRenameChannel);
+    if (deleteChannelBtn) deleteChannelBtn.addEventListener('click', doDeleteChannel);
+    if (headerDeleteChannelBtn) headerDeleteChannelBtn.addEventListener('click', doDeleteChannel);
 
     // Fetch videos from YouTube channel
     async function handleFetchChannel() {
@@ -1621,6 +1784,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnText) btnText.textContent = '🔍 Fetch Videos';
         if (spinner) spinner.classList.add('hidden');
         fetchChannelBtn.disabled = false;
+        updateChannelActionButtons();
       }
     }
 
@@ -1628,7 +1792,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedChannelsSelect) {
       savedChannelsSelect.addEventListener('change', async (e) => {
         const chId = e.target.value;
-        if (!chId) return;
+        updateChannelActionButtons();
+        if (!chId) {
+          if (currentChannelTitle) currentChannelTitle.textContent = 'Select or Fetch a Channel';
+          if (currentChannelLink) currentChannelLink.classList.add('hidden');
+          if (statTotalVids) statTotalVids.textContent = '0';
+          if (statUploadedVids) statUploadedVids.textContent = '0';
+          if (statAvailableVids) statAvailableVids.textContent = '0';
+          channelVideosGrid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center;">Koi channel selected nahi hai. Upar se channel chunein.</div>';
+          return;
+        }
         channelVideosGrid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center;">Loading channel library...</div>';
         try {
           const res = await fetch(`/api/channels/${chId}/videos`);
@@ -1645,6 +1818,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         } catch (err) {
           alert(`Error loading channel videos: ${err.message}`);
+        } finally {
+          updateChannelActionButtons();
         }
       });
     }
@@ -1876,7 +2051,12 @@ document.addEventListener('DOMContentLoaded', () => {
       cancelActiveBatchBtn.addEventListener('click', async () => {
         if (!confirm('Kya aap running batch aur Kaggle engine ko stop karna chahte hain?')) return;
         try {
-          const res = await fetch('/api/batch/cancel', { method: 'POST' });
+          const bideoUserId = (batchBideoAccountSelect ? batchBideoAccountSelect.value : '') || (currentActiveAccount ? (currentActiveAccount._id || currentActiveAccount.id) : '');
+          const res = await fetch('/api/batch/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bideo_user_id: bideoUserId })
+          });
           const d = await res.json();
           alert(d.message || 'Batch cancelled');
           pollBatchAndKaggleStatus();
@@ -1910,7 +2090,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelActiveBatchBtn = document.getElementById('cancelActiveBatchBtn');
 
     try {
-      const res = await fetch('/api/batch/status');
+      const bideoUserId = (document.getElementById('batchBideoAccountSelect') ? document.getElementById('batchBideoAccountSelect').value : '') || (currentActiveAccount ? (currentActiveAccount._id || currentActiveAccount.id) : '');
+      const url = bideoUserId ? `/api/batch/status?bideo_user_id=${encodeURIComponent(bideoUserId)}` : '/api/batch/status';
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.success) return;
 

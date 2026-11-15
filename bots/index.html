@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;800;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.7.0">
+  <link rel="stylesheet" href="style.css?v=3.7.5">
 </head>
 <body class="cyber-theme">
 
@@ -254,6 +254,55 @@
         </div>
       </div>
 
+      <!-- MASTER GLOBAL 24H VIEW BUDGET & SWITCH CONTROLLER -->
+      <div class="global-view-controller-card">
+        <div class="global-ctrl-top">
+          <div class="global-info-col">
+            <div class="global-title-row">
+              <span class="global-core-icon">🌐</span>
+              <div class="global-title-wrap">
+                <span class="global-title-label">MASTER 24H GLOBAL VIEW ENGINE</span>
+                <span class="global-sub-text">Overall view cap across ALL channels & organic explore browsing</span>
+              </div>
+            </div>
+          </div>
+          <div class="global-switch-col">
+            <span class="switch-helper-text" id="globalSwitchLabel">VIEW BOT: ON</span>
+            <label class="cyber-switch master-cyber-switch" title="Master View Bot Switch (Turns all views ON/OFF)">
+              <input type="checkbox" id="globalViewToggle" checked>
+              <span class="cyber-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="global-ctrl-body">
+          <div class="global-limit-input-wrap">
+            <div class="input-with-label global-input-box">
+              <span class="input-prefix">GLOBAL BUDGET:</span>
+              <input type="number" id="globalLimitInput" class="cyber-input-limit" value="100" min="0" step="10" placeholder="100">
+              <span class="input-suffix">VIEWS / 24H</span>
+            </div>
+            <button id="saveGlobalLimitBtn" class="btn btn-cyber-cyan btn-sm">
+              <span class="btn-text">SAVE BUDGET</span>
+            </button>
+          </div>
+
+          <div class="global-progress-col">
+            <div class="global-progress-header">
+              <span class="progress-info-txt" id="globalViewsProgressTxt">0 / 100 Global Views (0%)</span>
+              <span class="sub-stat-pills" id="globalBreakdownTxt">Channels: 0 | Explore: 0</span>
+            </div>
+            <div class="ctrl-bar-track global-track">
+              <div id="globalBarFill" class="ctrl-bar-fill cyan-fill" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div id="globalStatusBadge" class="ctrl-status-badge active global-badge">
+            🟢 GLOBAL ENGINE ACTIVE
+          </div>
+        </div>
+      </div>
+
       <!-- ADD NEW CHANNEL BAR -->
       <div class="add-channel-cyber-bar">
         <div class="add-bar-title">
@@ -366,6 +415,6 @@
 
   </main>
 
-  <script src="app.js?v=3.7.0"></script>
+  <script src="app.js?v=3.7.5"></script>
 </body>
 </html>

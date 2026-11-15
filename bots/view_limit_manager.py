@@ -15,10 +15,11 @@ class ViewLimitManager:
     """
     Thread-Safe 24-Hour Rolling Limit & Multi-Channel View Automation Manager
     ------------------------------------------------------------------------
+    - Master Global 24H View Budget & Global ON/OFF Switch.
     - Manages per-channel daily view targets and ON/OFF switches.
     - Rolling 24-hour window (86,400s) with automatic timestamp pruning.
     - Dynamically balances views across all registered channels.
-    - When 24h limit is reached, signals farming engine to execute stealth browsing.
+    - When 24h limit is reached, signals farming engine to execute stealth browsing or sleep in standby.
     """
     _instance = None
     _lock = threading.RLock()
@@ -37,6 +38,11 @@ class ViewLimitManager:
 
     def _get_default_data(self):
         return {
+            "_global": {
+                "enabled": True,
+                "daily_limit": 100,
+                "stealth_history": []
+            },
             DEFAULT_CRYVEX_CHANNEL_ID: {
                 "channel_id": DEFAULT_CRYVEX_CHANNEL_ID,
                 "name": "cryvex",
@@ -55,18 +61,36 @@ class ViewLimitManager:
                 with open(self.file_path, "r", encoding="utf-8") as f:
                     saved = json.load(f)
                     if isinstance(saved, dict):
-                        # Ensure default cryvex channel is always present
-                        for k, v in defaults.items():
-                            if k not in saved:
-                                saved[k] = v
-                            else:
-                                saved[k].setdefault("channel_id", v["channel_id"])
-                                saved[k].setdefault("name", v["name"])
-                                saved[k].setdefault("username", v["username"])
-                                saved[k].setdefault("avatar", v.get("avatar", ""))
-                                saved[k].setdefault("enabled", v.get("enabled", True))
-                                saved[k].setdefault("daily_limit", v.get("daily_limit", 200))
-                                saved[k].setdefault("history", [])
+                        # Ensure _global is present
+                        if "_global" not in saved:
+                            saved["_global"] = defaults["_global"]
+                        else:
+                            saved["_global"].setdefault("enabled", True)
+                            saved["_global"].setdefault("daily_limit", 100)
+                            saved["_global"].setdefault("stealth_history", [])
+
+                        # Ensure default cryvex channel is present
+                        if DEFAULT_CRYVEX_CHANNEL_ID not in saved:
+                            saved[DEFAULT_CRYVEX_CHANNEL_ID] = defaults[DEFAULT_CRYVEX_CHANNEL_ID]
+                        else:
+                            c = saved[DEFAULT_CRYVEX_CHANNEL_ID]
+                            c.setdefault("channel_id", DEFAULT_CRYVEX_CHANNEL_ID)
+                            c.setdefault("name", "cryvex")
+                            c.setdefault("username", DEFAULT_CRYVEX_USERNAME)
+                            c.setdefault("avatar", DEFAULT_CRYVEX_AVATAR)
+                            c.setdefault("enabled", True)
+                            c.setdefault("daily_limit", 200)
+                            c.setdefault("history", [])
+
+                        # Ensure other channels have required keys
+                        for k, v in saved.items():
+                            if k == "_global":
+                                continue
+                            if isinstance(v, dict):
+                                v.setdefault("channel_id", k)
+                                v.setdefault("enabled", True)
+                                v.setdefault("daily_limit", 200)
+                                v.setdefault("history", [])
                         return saved
             except Exception as e:
                 print(f"⚠️ [ViewLimitManager] Load error: {e}")
@@ -89,17 +113,130 @@ class ViewLimitManager:
         now = time.time()
         cutoff = now - 86400
         changed = False
+
+        # Prune global stealth views
+        g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 100, "stealth_history": []})
+        st_hist = g.get("stealth_history", [])
+        new_st_hist = [h for h in st_hist if h.get("ts", 0) >= cutoff]
+        if len(new_st_hist) != len(st_hist):
+            g["stealth_history"] = new_st_hist
+            changed = True
+
+        # Prune channel views
         for channel_id, ch_data in self.data.items():
+            if channel_id == "_global" or not isinstance(ch_data, dict):
+                continue
             hist = ch_data.get("history", [])
             new_hist = [h for h in hist if h.get("ts", 0) >= cutoff]
             if len(new_hist) != len(hist):
                 ch_data["history"] = new_hist
                 changed = True
+
         if changed:
             self._save()
 
+    # -------------------------------------------------------------
+    # Global Limit & Master Switch Methods
+    # -------------------------------------------------------------
+    def is_global_enabled(self):
+        """Returns True if the master view engine is switched ON."""
+        with self.lock:
+            g = self.data.get("_global", {})
+            return g.get("enabled", True)
+
+    def get_global_limit(self):
+        """Returns master 24h view budget."""
+        with self.lock:
+            g = self.data.get("_global", {})
+            return int(g.get("daily_limit", 100))
+
+    def get_stealth_views_24h(self):
+        """Returns stealth views delivered in the last 24h."""
+        now = time.time()
+        cutoff = now - 86400
+        g = self.data.get("_global", {})
+        st_hist = g.get("stealth_history", [])
+        return sum(1 for h in st_hist if h.get("ts", 0) >= cutoff)
+
+    def get_total_channel_views_24h(self):
+        """Returns sum of all views delivered across all target channels in last 24h."""
+        now = time.time()
+        cutoff = now - 86400
+        total = 0
+        for k, v in self.data.items():
+            if k == "_global" or not isinstance(v, dict):
+                continue
+            hist = v.get("history", [])
+            total += sum(1 for h in hist if h.get("ts", 0) >= cutoff)
+        return total
+
+    def get_total_views_24h(self):
+        """Total views delivered across all channels AND stealth in rolling 24h."""
+        return self.get_total_channel_views_24h() + self.get_stealth_views_24h()
+
+    def is_viewing_allowed_globally(self):
+        """
+        Master check: Can the view engine perform ANY views (target or stealth)?
+        Returns: (allowed: bool, status_msg: str, total_views: int, global_limit: int)
+        """
+        with self.lock:
+            self.data = self._load()
+            self.prune_history()
+
+            g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 100, "stealth_history": []})
+            enabled = g.get("enabled", True)
+            limit = int(g.get("daily_limit", 100))
+            total_views = self.get_total_views_24h()
+
+            if not enabled:
+                return False, "⏸️ Master View Engine Paused (OFF)", total_views, limit
+
+            if limit > 0 and total_views >= limit:
+                return False, f"⚠️ 24H Global Budget Completed ({total_views}/{limit})", total_views, limit
+
+            return True, f"🟢 Global Engine Active ({total_views}/{limit})", total_views, limit
+
+    def update_global_config(self, enabled=None, daily_limit=None):
+        """Updates master view switch and/or global 24h budget."""
+        with self.lock:
+            self.data = self._load()
+            g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 100, "stealth_history": []})
+
+            if enabled is not None:
+                g["enabled"] = bool(enabled)
+            if daily_limit is not None:
+                g["daily_limit"] = max(0, int(daily_limit))
+
+            self._save()
+            total_views = self.get_total_views_24h()
+            limit = g["daily_limit"]
+            pct = min(100, int((total_views / limit) * 100)) if limit > 0 else 100
+
+            return {
+                "enabled": g["enabled"],
+                "daily_limit": g["daily_limit"],
+                "total_views_24h": total_views,
+                "progress_pct": pct
+            }
+
+    def record_stealth_view(self, video_id="", creator=""):
+        """Records an organic stealth view under _global history."""
+        with self.lock:
+            self.data = self._load()
+            g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 100, "stealth_history": []})
+            g.setdefault("stealth_history", []).append({
+                "ts": time.time(),
+                "video_id": video_id,
+                "creator": creator[:40] if creator else ""
+            })
+            self.prune_history()
+            self._save()
+
+    # -------------------------------------------------------------
+    # Per-Channel View Management Methods
+    # -------------------------------------------------------------
     def get_views_last_24h(self, channel_id):
-        """Calculates views delivered to this channel in the rolling last 24h."""
+        """Calculates views delivered to this specific channel in the rolling last 24h."""
         now = time.time()
         cutoff = now - 86400
         ch_data = self.data.get(channel_id, {})
@@ -108,15 +245,25 @@ class ViewLimitManager:
 
     def is_viewing_allowed(self, channel_id):
         """
-        Checks if views can be delivered to this channel.
+        Checks if views can be delivered to this specific channel.
         Returns: (allowed: bool, status_msg: str, views_24h: int, limit: int)
         """
         with self.lock:
             self.data = self._load()
             self.prune_history()
 
+            # First check global master switch
+            if not self.is_global_enabled():
+                return False, "⏸️ Global View Engine Paused", self.get_views_last_24h(channel_id), 0
+
+            # Check global limit
+            g_limit = self.get_global_limit()
+            total_views = self.get_total_views_24h()
+            if g_limit > 0 and total_views >= g_limit:
+                return False, f"⚠️ Global 24H Limit Reached ({total_views}/{g_limit})", self.get_views_last_24h(channel_id), 0
+
             ch_data = self.data.get(channel_id)
-            if not ch_data:
+            if not ch_data or channel_id == "_global":
                 return False, "Channel not found", 0, 0
 
             enabled = ch_data.get("enabled", True)
@@ -135,8 +282,7 @@ class ViewLimitManager:
         """Records a successful view delivered to a video under this channel."""
         with self.lock:
             self.data = self._load()
-            if channel_id not in self.data:
-                # Fallback to cryvex if unknown channel
+            if channel_id not in self.data or channel_id == "_global":
                 channel_id = DEFAULT_CRYVEX_CHANNEL_ID
 
             ch_data = self.data.setdefault(channel_id, {
@@ -159,14 +305,21 @@ class ViewLimitManager:
     def get_eligible_channels(self):
         """
         Returns list of channel dicts that are currently ENABLED and have NOT reached their 24h limit.
-        Sorted by completion percentage (channels with fewest views prioritized).
+        Returns empty list if global master switch is OFF or global limit is reached.
         """
         with self.lock:
             self.data = self._load()
             self.prune_history()
 
+            # If global switch is OFF or global limit reached, no channels are eligible
+            g_allowed, _, _, _ = self.is_viewing_allowed_globally()
+            if not g_allowed:
+                return []
+
             eligible = []
             for ch_id, ch_data in self.data.items():
+                if ch_id == "_global" or not isinstance(ch_data, dict):
+                    continue
                 if not ch_data.get("enabled", True):
                     continue
 
@@ -192,21 +345,17 @@ class ViewLimitManager:
             return eligible
 
     def add_channel(self, identifier, daily_limit=200):
-        """
-        Adds a channel to the views manager using identifier (Channel ID or Username/Handle).
-        Resolves details dynamically.
-        """
+        """Adds a channel to the views manager using identifier (Channel ID or Username/Handle)."""
         with self.lock:
             self.data = self._load()
 
             from bot_engine import BotEngine
             resolved_id, resolved_name = BotEngine.resolve_channel_id(identifier)
-            if not resolved_id:
+            if not resolved_id or resolved_id == "_global":
                 return False, "Channel resolution failed"
 
             daily_limit = max(0, int(daily_limit))
 
-            # Fetch extra metadata if available
             avatar_url = ""
             try:
                 results = BotEngine.search_channels(resolved_name)
@@ -221,7 +370,6 @@ class ViewLimitManager:
                 avatar_url = DEFAULT_CRYVEX_AVATAR
 
             if resolved_id in self.data:
-                # Update existing
                 self.data[resolved_id]["daily_limit"] = daily_limit
                 self.data[resolved_id]["enabled"] = True
                 if avatar_url:
@@ -229,7 +377,6 @@ class ViewLimitManager:
                 self._save()
                 return True, f"Channel '{resolved_name}' updated with 24h limit of {daily_limit} views!"
 
-            # Create new
             self.data[resolved_id] = {
                 "channel_id": resolved_id,
                 "name": resolved_name,
@@ -246,8 +393,8 @@ class ViewLimitManager:
         """Removes a channel from views management."""
         with self.lock:
             self.data = self._load()
-            if channel_id == DEFAULT_CRYVEX_CHANNEL_ID:
-                return False, "Cannot delete master Cryvex channel (you can pause it instead)!"
+            if channel_id in (DEFAULT_CRYVEX_CHANNEL_ID, "_global"):
+                return False, "Cannot delete master channel (you can pause it instead)!"
 
             if channel_id in self.data:
                 removed_name = self.data[channel_id].get("name", channel_id)
@@ -260,6 +407,9 @@ class ViewLimitManager:
         """Updates channel limit or enabled status."""
         with self.lock:
             self.data = self._load()
+            if channel_id == "_global":
+                return True, self.update_global_config(enabled=enabled, daily_limit=daily_limit)
+
             if channel_id not in self.data:
                 return False, "Channel not found"
 
@@ -280,27 +430,28 @@ class ViewLimitManager:
             }
 
     def get_all_channels_summary(self):
-        """Returns comprehensive summary of all managed channels for Dashboard API."""
+        """Returns comprehensive summary of global settings and all managed channels."""
         with self.lock:
             self.data = self._load()
             self.prune_history()
 
             summary_list = []
-            total_views_24h = 0
             active_count = 0
 
             for ch_id, ch_data in self.data.items():
+                if ch_id == "_global" or not isinstance(ch_data, dict):
+                    continue
+
                 views_24h = self.get_views_last_24h(ch_id)
                 limit = int(ch_data.get("daily_limit", 200))
                 enabled = ch_data.get("enabled", True)
-                total_views_24h += views_24h
 
                 if enabled:
                     active_count += 1
 
                 allowed, status_msg, _, _ = self.is_viewing_allowed(ch_id)
-
                 pct = min(100, int((views_24h / limit) * 100)) if limit > 0 else 100
+
                 summary_list.append({
                     "channel_id": ch_id,
                     "name": ch_data.get("name") or ch_data.get("username") or ch_id,
@@ -314,13 +465,28 @@ class ViewLimitManager:
                     "status_text": status_msg
                 })
 
-            # Sort: Cryvex first, then alphabetical
             summary_list.sort(key=lambda x: (0 if x["channel_id"] == DEFAULT_CRYVEX_CHANNEL_ID else 1, x["name"].lower()))
+
+            # Global metrics
+            g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 100, "stealth_history": []})
+            g_enabled = g.get("enabled", True)
+            g_limit = int(g.get("daily_limit", 100))
+            ch_views = self.get_total_channel_views_24h()
+            st_views = self.get_stealth_views_24h()
+            total_views = ch_views + st_views
+            g_pct = min(100, int((total_views / g_limit) * 100)) if g_limit > 0 else 100
+            g_allowed, g_status_msg, _, _ = self.is_viewing_allowed_globally()
 
             return {
                 "channels": summary_list,
                 "total_channels": len(summary_list),
                 "active_channels": active_count,
-                "total_views_24h": total_views_24h
+                "total_views_24h": total_views,
+                "channel_views_24h": ch_views,
+                "stealth_views_24h": st_views,
+                "global_enabled": g_enabled,
+                "global_daily_limit": g_limit,
+                "global_progress_pct": g_pct,
+                "global_is_allowed": g_allowed,
+                "global_status_text": g_status_msg
             }
-
