@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;800;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.6.0">
+  <link rel="stylesheet" href="style.css?v=3.7.0">
 </head>
 <body class="cyber-theme">
 
@@ -226,7 +226,75 @@
     </section>
 
     <!-- ============================================================= -->
-    <!-- SECTION 1: CRYVEX MASTER COIN VAULT & CLAIM CONTROLLER -->
+    <!-- SECTION 1: 24H VIEWS AUTOMATION & MULTI-CHANNEL MANAGER -->
+    <!-- ============================================================= -->
+    <section class="views-hud-section cyber-card">
+      <div class="views-hud-header">
+        <div class="hud-title-col">
+          <div class="hud-badge-tag"><span class="pulse-dot cyan"></span> 24H VIEWS ROLLING LIMITS & DYNAMIC MULTI-CHANNEL CONTROLLER</div>
+          <h2>🎯 24H VIEWS AUTOMATION & MULTI-CHANNEL MANAGER</h2>
+          <p class="hud-desc">Set 24H view targets for any channel. When daily targets are completed or bots are free, bots automatically browse explore videos & like them!</p>
+        </div>
+        <div class="views-header-stats">
+          <div class="stat-pill-mini">
+            <span class="pill-lbl">24H VIEWS:</span>
+            <b id="totalViews24hBadge" class="gold-text">0 Views</b>
+          </div>
+          <div class="stat-pill-mini">
+            <span class="pill-lbl">ACTIVE CHANNELS:</span>
+            <b id="activeChannelsCountBadge" class="cyan-text">1 Channel</b>
+          </div>
+          <div class="stat-pill-mini">
+            <span class="pill-lbl">ENGINE MODE:</span>
+            <span id="farmingModeBadge" class="mode-badge-green">🟢 TARGET BOOSTING</span>
+          </div>
+          <button id="refreshViewsBtn" class="btn btn-cyber-sm">
+            <span>🔄 Sync Views</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ADD NEW CHANNEL BAR -->
+      <div class="add-channel-cyber-bar">
+        <div class="add-bar-title">
+          <span class="neon-plus">➕</span>
+          <span>ADD TARGET CHANNEL FOR 24H VIEWS:</span>
+        </div>
+        <form id="addChannelForm" class="add-channel-form">
+          <div class="add-input-wrap channel-name-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="newChannelInput" class="cyber-input-text" placeholder="Username, @handle or Channel ID (e.g. cryvex)" required>
+          </div>
+          <div class="add-input-wrap channel-limit-wrap">
+            <span class="input-icon">⚡</span>
+            <input type="number" id="newChannelLimit" class="cyber-input-num" value="200" min="10" step="10" placeholder="24H Limit (200)" required>
+            <span class="unit-tag">VIEWS/24H</span>
+          </div>
+          <button type="submit" id="addChannelSubmitBtn" class="btn btn-cyber-cyan">
+            <span class="btn-text">🚀 ADD TO AUTOMATION</span>
+            <span class="spinner hidden"></span>
+          </button>
+        </form>
+        <div id="addChannelFeedback" class="add-channel-feedback"></div>
+      </div>
+
+      <!-- CHANNELS GRID -->
+      <div id="channelsViewsGrid" class="channels-views-grid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <!-- STEALTH FALLBACK INFO FOOTER -->
+      <div class="views-stealth-notice">
+        <span class="stealth-shield-icon">🛡️</span>
+        <div class="stealth-notice-content">
+          <b>SMART STEALTH BROWSING GUARANTEE:</b>
+          <span>Jab kisi channel ka 24-hour target complete ho jata hai ya bots free bachte hain, bots idle nahi bethte — automatically global explore feed se public videos 20–40s watch karte hain aur organic likes dete hain taaki account trust score 100% natural aur safe rahe.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 2: CRYVEX MASTER COIN VAULT & CLAIM CONTROLLER -->
     <!-- ============================================================= -->
     <section class="coins-banner-card glass-card">
       <div class="coins-banner-left">
@@ -298,6 +366,6 @@
 
   </main>
 
-  <script src="app.js?v=3.6.0"></script>
+  <script src="app.js?v=3.7.0"></script>
 </body>
 </html>

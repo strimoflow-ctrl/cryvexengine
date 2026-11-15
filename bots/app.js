@@ -364,13 +364,316 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // -------------------------------------------------------------
+  // 5c. 24H View Limits & Multi-Channel Automation Controls
+  // -------------------------------------------------------------
+  const totalViews24hBadge = document.getElementById('totalViews24hBadge');
+  const activeChannelsCountBadge = document.getElementById('activeChannelsCountBadge');
+  const farmingModeBadge = document.getElementById('farmingModeBadge');
+  const refreshViewsBtn = document.getElementById('refreshViewsBtn');
+  const addChannelForm = document.getElementById('addChannelForm');
+  const newChannelInput = document.getElementById('newChannelInput');
+  const newChannelLimit = document.getElementById('newChannelLimit');
+  const addChannelSubmitBtn = document.getElementById('addChannelSubmitBtn');
+  const addChannelFeedback = document.getElementById('addChannelFeedback');
+  const channelsViewsGrid = document.getElementById('channelsViewsGrid');
+
+  let cachedChannels = [];
+
+  async function loadViewChannels() {
+    try {
+      const [resViews, resFarm] = await Promise.all([
+        fetch('/api/views/channels'),
+        fetch('/api/farm/status').catch(() => null)
+      ]);
+
+      const data = await resViews.json();
+      if (!data.success) return;
+
+      cachedChannels = data.channels || [];
+
+      // Update Header Stats
+      if (totalViews24hBadge) {
+        totalViews24hBadge.textContent = `${data.total_views_24h || 0} Views`;
+      }
+      if (activeChannelsCountBadge) {
+        const count = data.active_channels || 0;
+        activeChannelsCountBadge.textContent = `${count} Channel${count === 1 ? '' : 's'}`;
+      }
+
+      // Check farming engine mode
+      if (resFarm && resFarm.ok) {
+        const farmData = await resFarm.json();
+        if (farmData.success && farmData.status && farmingModeBadge) {
+          const mode = farmData.status.current_mode || 'Target Channel Views';
+          if (mode.toLowerCase().includes('stealth')) {
+            farmingModeBadge.className = 'mode-badge-stealth';
+            farmingModeBadge.textContent = '🛡️ STEALTH BROWSING (ALL TARGETS MET)';
+          } else {
+            farmingModeBadge.className = 'mode-badge-green';
+            farmingModeBadge.textContent = '🟢 TARGET BOOSTING';
+          }
+        }
+      }
+
+      renderViewChannels(cachedChannels);
+    } catch (e) {
+      console.error('loadViewChannels error:', e);
+    }
+  }
+
+  function renderViewChannels(channels) {
+    if (!channelsViewsGrid) return;
+
+    // Check if user is currently typing in an input inside channelsViewsGrid
+    const activeEl = document.activeElement;
+    const isUserEditing = activeEl && channelsViewsGrid.contains(activeEl);
+
+    // If user is actively typing, only update values of non-focused elements
+    if (isUserEditing) {
+      channels.forEach(ch => {
+        const barEl = document.getElementById(`barView_${ch.channel_id}`);
+        const txtEl = document.getElementById(`txtView_${ch.channel_id}`);
+        const badgeEl = document.getElementById(`statusBadgeView_${ch.channel_id}`);
+
+        if (barEl) {
+          barEl.style.width = `${ch.progress_pct || 0}%`;
+        }
+        if (txtEl) {
+          txtEl.textContent = ch.daily_limit > 0
+            ? `${ch.views_24h} / ${ch.daily_limit} Views (24h)`
+            : `${ch.views_24h} Views (Unlimited)`;
+        }
+        if (badgeEl) {
+          if (!ch.enabled) {
+            badgeEl.className = 'ctrl-status-badge paused';
+            badgeEl.textContent = '⏸️ PAUSED (OFF)';
+          } else if (ch.daily_limit > 0 && ch.views_24h >= ch.daily_limit) {
+            badgeEl.className = 'ctrl-status-badge limit';
+            badgeEl.textContent = '⚠️ 24H TARGET COMPLETED';
+          } else {
+            badgeEl.className = 'ctrl-status-badge active';
+            badgeEl.textContent = '🟢 BOOSTING ACTIVE';
+          }
+        }
+      });
+      return;
+    }
+
+    // Full render
+    channelsViewsGrid.innerHTML = channels.map(ch => {
+      const isCryvex = ch.channel_id === '6ada0b9dfb39968c7c48dd7b' || ch.username === 'cryvex';
+      const initials = (ch.name || ch.username || 'CH').slice(0, 2).toUpperCase();
+      const pct = ch.progress_pct || 0;
+
+      let badgeClass = 'active';
+      let badgeText = '🟢 BOOSTING ACTIVE';
+      if (!ch.enabled) {
+        badgeClass = 'paused';
+        badgeText = '⏸️ PAUSED (OFF)';
+      } else if (ch.daily_limit > 0 && ch.views_24h >= ch.daily_limit) {
+        badgeClass = 'limit';
+        badgeText = '⚠️ 24H TARGET COMPLETED (BROWSING STEALTH)';
+      }
+
+      const avatarHtml = ch.avatar
+        ? `<img src="${ch.avatar}" class="ch-avatar-img" onerror="this.onerror=null; this.outerHTML='<div class=\\'ch-avatar-fallback\\'>${initials}</div>'">`
+        : `<div class="ch-avatar-fallback">${initials}</div>`;
+
+      return `
+        <div class="channel-view-card ${isCryvex ? 'is-cryvex' : ''}" data-id="${ch.channel_id}">
+          <div class="ch-card-header">
+            <div class="ch-avatar-info">
+              ${avatarHtml}
+              <div class="ch-meta-col">
+                <div class="ch-name-row">
+                  <span class="ch-title-text">${ch.name || ch.username}</span>
+                  ${isCryvex ? '<span class="ch-master-badge">👑 MASTER</span>' : ''}
+                </div>
+                <span class="ch-id-text" title="${ch.channel_id}">ID: ${ch.channel_id.slice(0, 10)}...</span>
+              </div>
+            </div>
+            <label class="cyber-switch" title="Toggle 24H Views ON/OFF">
+              <input type="checkbox" class="ch-toggle-input" data-id="${ch.channel_id}" ${ch.enabled ? 'checked' : ''}>
+              <span class="cyber-slider"></span>
+            </label>
+          </div>
+
+          <div class="ch-controls-box">
+            <div class="ctrl-header">
+              <span class="ctrl-label">⚡ 24H VIEW TARGET:</span>
+              <span class="ctrl-mined-txt" id="txtView_${ch.channel_id}">
+                ${ch.daily_limit > 0 ? `${ch.views_24h} / ${ch.daily_limit} Views (24h)` : `${ch.views_24h} Views`}
+              </span>
+            </div>
+
+            <div class="ctrl-limit-row">
+              <div class="input-with-label">
+                <span class="input-prefix">LIMIT:</span>
+                <input type="number" id="limitInputView_${ch.channel_id}" class="cyber-input-limit" value="${ch.daily_limit}" min="10" step="10">
+                <span class="input-suffix">VIEWS</span>
+              </div>
+              <button class="btn-save-limit btn-save-view-limit" data-id="${ch.channel_id}">SAVE</button>
+            </div>
+
+            <div class="ctrl-progress-row">
+              <div class="ctrl-bar-track">
+                <div id="barView_${ch.channel_id}" class="ctrl-bar-fill ${isCryvex ? 'gold-fill' : 'cyan-fill'}" style="width: ${pct}%"></div>
+              </div>
+            </div>
+
+            <div id="statusBadgeView_${ch.channel_id}" class="ctrl-status-badge ${badgeClass}">${badgeText}</div>
+          </div>
+
+          ${!isCryvex ? `
+            <button class="btn-remove-channel" data-id="${ch.channel_id}" data-name="${ch.name || ch.username}">
+              🗑️ Remove Channel
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Attach Event Listeners to Cards
+    channelsViewsGrid.querySelectorAll('.ch-toggle-input').forEach(input => {
+      input.addEventListener('change', async (e) => {
+        const chId = e.target.dataset.id;
+        const enabled = e.target.checked;
+        try {
+          await fetch(`/api/views/channels/${chId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+          });
+          loadViewChannels();
+        } catch (err) {
+          console.error('Toggle error:', err);
+        }
+      });
+    });
+
+    channelsViewsGrid.querySelectorAll('.btn-save-view-limit').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const chId = e.target.dataset.id;
+        const limitInput = document.getElementById(`limitInputView_${chId}`);
+        const limitVal = limitInput ? Number(limitInput.value) : 200;
+
+        const origText = e.target.textContent;
+        e.target.textContent = 'SAVED!';
+        e.target.style.background = '#10B981';
+        e.target.style.color = '#fff';
+
+        try {
+          await fetch(`/api/views/channels/${chId}/limit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ daily_limit: limitVal })
+          });
+          loadViewChannels();
+        } catch (err) {
+          console.error('Save view limit error:', err);
+        } finally {
+          setTimeout(() => {
+            e.target.textContent = origText;
+            e.target.style.background = '';
+            e.target.style.color = '';
+          }, 1200);
+        }
+      });
+    });
+
+    channelsViewsGrid.querySelectorAll('.btn-remove-channel').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const chId = e.target.dataset.id;
+        const chName = e.target.dataset.name;
+        if (!confirm(`Kya aap sach me '${chName}' ko 24h view automation se remove karna chahte hain?`)) {
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/views/channels/${chId}`, { method: 'DELETE' });
+          const d = await res.json();
+          if (d.success) {
+            loadViewChannels();
+          } else {
+            alert(d.message || 'Failed to remove channel');
+          }
+        } catch (err) {
+          console.error('Remove channel error:', err);
+        }
+      });
+    });
+  }
+
+  // Handle Add Channel Form
+  if (addChannelForm) {
+    addChannelForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const identifier = newChannelInput ? newChannelInput.value.trim() : '';
+      const dailyLimit = newChannelLimit ? Number(newChannelLimit.value) : 200;
+
+      if (!identifier) return;
+
+      if (addChannelSubmitBtn) {
+        addChannelSubmitBtn.disabled = true;
+      }
+      if (addChannelFeedback) {
+        addChannelFeedback.className = 'add-channel-feedback';
+        addChannelFeedback.textContent = '⏳ Resolving channel and adding to 24H automation...';
+      }
+
+      try {
+        const res = await fetch('/api/views/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, daily_limit: dailyLimit })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (addChannelFeedback) {
+            addChannelFeedback.className = 'add-channel-feedback success';
+            addChannelFeedback.textContent = `✅ ${data.message || 'Channel added successfully!'}`;
+          }
+          if (newChannelInput) newChannelInput.value = '';
+          await loadViewChannels();
+        } else {
+          if (addChannelFeedback) {
+            addChannelFeedback.className = 'add-channel-feedback error';
+            addChannelFeedback.textContent = `⚠️ ${data.message || 'Failed to add channel'}`;
+          }
+        }
+      } catch (err) {
+        if (addChannelFeedback) {
+          addChannelFeedback.className = 'add-channel-feedback error';
+          addChannelFeedback.textContent = '⚠️ Network error while adding channel';
+        }
+      } finally {
+        if (addChannelSubmitBtn) {
+          addChannelSubmitBtn.disabled = false;
+        }
+        setTimeout(() => {
+          if (addChannelFeedback) addChannelFeedback.textContent = '';
+        }, 5000);
+      }
+    });
+  }
+
+  if (refreshViewsBtn) {
+    refreshViewsBtn.addEventListener('click', loadViewChannels);
+  }
+
+  // -------------------------------------------------------------
   // 6. Bootstrap Initial State & 24/7 Background Polling
   // -------------------------------------------------------------
   loadPodiumStatus();
   loadCryvexCoins();
+  loadViewChannels();
 
-  // Poll live rankings & logs every 3 seconds
-  setInterval(loadPodiumStatus, 3000);
+  // Poll live rankings, logs & views every 3 seconds
+  setInterval(() => {
+    loadPodiumStatus();
+    loadViewChannels();
+  }, 3000);
 
   // Poll Cryvex coin balance & cooldown every 10 seconds
   setInterval(loadCryvexCoins, 10000);

@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from bot_engine import BotEngine, AutoCoinMiner, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE, DEFAULT_USER_AGENT
 from farming_engine import AutonomousFarmEngine
+from view_limit_manager import ViewLimitManager
 import requests
 
 if sys.platform == "win32":
@@ -16,16 +17,6 @@ if sys.platform == "win32":
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
-
-# -------------------------------------------------------------
-# NOX PFP Pinterest & Monetag Automation Engine
-# -------------------------------------------------------------
-try:
-    from pfp_engine import pfp_bp, start_pfp_background_thread
-    app.register_blueprint(pfp_bp)
-    print("✅ [NOX PFP] Pinterest & Monetag Blueprint registered successfully!")
-except Exception as e:
-    print(f"⚠️ [NOX PFP] Blueprint registration error: {e}")
 
 
 # -------------------------------------------------------------
@@ -292,6 +283,93 @@ def toggle_farm():
     return jsonify({"success": True, "is_active": farm.running, "status": farm.get_status()})
 
 
+# -------------------------------------------------------------
+# 24H Views & Multi-Channel Limit Management API
+# -------------------------------------------------------------
+@app.route("/api/views/channels", methods=["GET"])
+def get_view_channels():
+    """Returns 24h view summary, limits, and status for all managed channels."""
+    try:
+        summary = ViewLimitManager.get_instance().get_all_channels_summary()
+        return jsonify({"success": True, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/channels", methods=["POST"])
+def add_view_channel():
+    """Adds a new channel by username or ID with 24h limit."""
+    body = request.get_json() or {}
+    identifier = body.get("identifier", "").strip()
+    daily_limit = body.get("daily_limit", 200)
+
+    if not identifier:
+        return jsonify({"success": False, "message": "Channel username ya ID zaroori hai!"}), 400
+
+    try:
+        ok, msg = ViewLimitManager.get_instance().add_channel(identifier, daily_limit=daily_limit)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        summary = ViewLimitManager.get_instance().get_all_channels_summary()
+        return jsonify({"success": True, "message": msg, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/channels/<channel_id>", methods=["DELETE"])
+def delete_view_channel(channel_id):
+    """Deletes a channel from 24h views management."""
+    try:
+        ok, msg = ViewLimitManager.get_instance().remove_channel(channel_id)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        summary = ViewLimitManager.get_instance().get_all_channels_summary()
+        return jsonify({"success": True, "message": msg, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/channels/<channel_id>/limit", methods=["POST"])
+def update_view_channel_limit(channel_id):
+    """Updates 24h daily limit or enabled toggle for a channel."""
+    body = request.get_json() or {}
+    daily_limit = body.get("daily_limit")
+    enabled = body.get("enabled")
+
+    try:
+        ok, res = ViewLimitManager.get_instance().update_channel(
+            channel_id,
+            enabled=enabled,
+            daily_limit=daily_limit
+        )
+        if not ok:
+            return jsonify({"success": False, "message": res}), 400
+        summary = ViewLimitManager.get_instance().get_all_channels_summary()
+        return jsonify({"success": True, "message": "Settings saved!", "data": res, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/channels/<channel_id>/toggle", methods=["POST"])
+def toggle_view_channel(channel_id):
+    """Toggles enabled state for a channel."""
+    body = request.get_json() or {}
+    enabled = body.get("enabled")
+
+    try:
+        mgr = ViewLimitManager.get_instance()
+        ch_data = mgr.data.get(channel_id)
+        if not ch_data:
+            return jsonify({"success": False, "message": "Channel nahi mila"}), 404
+
+        new_val = (not ch_data.get("enabled", True)) if enabled is None else bool(enabled)
+        ok, res = mgr.update_channel(channel_id, enabled=new_val)
+        summary = mgr.get_all_channels_summary()
+        return jsonify({"success": True, "message": "Status updated!", "data": res, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 if __name__ == "__main__":
     # 1. 24/7 multi-stream podium miner (Rank 1 Cryvex, Rank 2 Pankaj, Rank 3 Hariom) with 24h limits & toggles
     try:
@@ -303,13 +381,6 @@ if __name__ == "__main__":
 
     # 2. Start 24/7 autonomous farming engine (anti-rush, hourly spawner, review watchdog)
     AutonomousFarmEngine.get_instance().start()
-
-    # 3. Start 24/7 NOX PFP Pinterest & Monetag Automation Engine
-    try:
-        start_pfp_background_thread()
-        print("⚡ [NOX PFP] 24/7 Pinterest Auto-Poster & Telegram Scraper active in background!")
-    except Exception as e:
-        print(f"⚠️ [NOX PFP] Failed to start background worker: {e}")
 
     port = int(os.environ.get("PORT") or os.environ.get("SERVER_PORT") or os.environ.get("BOTS_PORT", 5050))
     print("==================================================")

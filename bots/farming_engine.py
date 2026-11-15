@@ -7,6 +7,7 @@ import threading
 import requests
 from datetime import datetime
 from bot_engine import BotEngine, DEFAULT_CRYVEX_CHANNEL_ID, DEFAULT_CRYVEX_USERNAME, BASE_NODE, DEFAULT_USER_AGENT
+from view_limit_manager import ViewLimitManager
 
 # Realistic human comments bank (Story, Cartoon, Animation, Entertainment)
 NATURAL_COMMENTS = [
@@ -117,7 +118,10 @@ class AutonomousFarmEngine:
         # Engagement probabilities
         self.cryvex_like_chance = 0.50
         self.cryvex_comment_chance = 0.30
-        self.stealth_like_chance = 0.08  # 8% (5-10% range)
+        self.stealth_like_chance = 0.20  # 20% organic likes during explore browsing
+
+        # 24H View Limits & Multi-Channel Manager
+        self.view_limit_mgr = ViewLimitManager.get_instance()
 
         # Farm State & Metrics
         self.state = {
@@ -129,6 +133,7 @@ class AutonomousFarmEngine:
             "next_review_check_seconds": 1200,
             "next_cryvex_view_seconds": 0,
             "anti_rush_active": True,
+            "current_mode": "Target Views Boosting",
             "cryvex_views_today": 0,
             "cryvex_likes_today": 0,
             "cryvex_comments_today": 0,
@@ -272,7 +277,12 @@ class AutonomousFarmEngine:
             delay = getattr(self, "next_cryvex_view_delay", 180)
             remaining_cryvex = max(0, int(delay - elapsed_cryvex))
             self.state["next_cryvex_view_seconds"] = remaining_cryvex
-            return dict(self.state)
+            res = dict(self.state)
+            try:
+                res["views_summary"] = self.view_limit_mgr.get_all_channels_summary()
+            except Exception:
+                pass
+            return res
 
     # -------------------------------------------------------------
     # WORKER 1: Hourly Bot Spawner (1 Bot/Hour, Max 300)
@@ -359,26 +369,37 @@ class AutonomousFarmEngine:
     # -------------------------------------------------------------
     def _farming_loop(self, worker_id=1):
         # Stagger worker starts
-        time.sleep(worker_id * 8)
+        time.sleep(worker_id * 6)
         local_ratio_counter = 0
         while self.running:
             try:
-                # 85% Priority on Cryvex: ~5 Cryvex views for every 1 Stealth browse
-                if local_ratio_counter < 5 or random.random() < 0.85:
-                    delivered = self._execute_organic_cryvex_view(worker_id)
-                    if delivered:
-                        local_ratio_counter += 1
-                        # Organic human pacing (25s to 38s) maintains 17k-20k views/week
-                        delay = random.randint(25, 38)
-                        self.state["next_cryvex_view_seconds"] = delay
-                        time.sleep(delay)
+                # 1. Check if any channels have remaining 24H view budget
+                eligible_channels = self.view_limit_mgr.get_eligible_channels()
+
+                if eligible_channels:
+                    self.state["current_mode"] = "Target Channel Views"
+                    # Periodically (1 in 6 times) perform stealth browsing for human-like profile
+                    if local_ratio_counter < 5 or random.random() < 0.85:
+                        delivered = self._execute_channel_view(eligible_channels, worker_id)
+                        if delivered:
+                            local_ratio_counter += 1
+                            delay = random.randint(25, 38)
+                            self.state["next_cryvex_view_seconds"] = delay
+                            time.sleep(delay)
+                        else:
+                            time.sleep(10)
                     else:
-                        time.sleep(10)
+                        # Occasional organic stealth browse
+                        self._execute_stealth_browsing()
+                        local_ratio_counter = 0
+                        delay = random.randint(20, 32)
+                        time.sleep(delay)
                 else:
-                    # Occasional stealth browsing on public explore feed
-                    self._execute_stealth_browsing()
-                    local_ratio_counter = 0
-                    delay = random.randint(20, 32)
+                    # ALL CHANNELS COMPLETED OR PAUSED!
+                    # Free bots execute organic explore browsing and like videos
+                    self.state["current_mode"] = "Organic Stealth Browsing (All 24H Targets Met)"
+                    self._execute_stealth_browsing(is_idle_fallback=True)
+                    delay = random.randint(20, 35)
                     time.sleep(delay)
 
             except Exception as e:
@@ -386,23 +407,27 @@ class AutonomousFarmEngine:
                 time.sleep(15)
 
     # -------------------------------------------------------------
-    # Organic Cryvex Interaction (Smart Catalog Rotation)
+    # Organic Multi-Channel Interaction & 24H Limit Delivery
     # -------------------------------------------------------------
-    def _execute_organic_cryvex_view(self, worker_id=1):
+    def _execute_channel_view(self, eligible_channels, worker_id=1):
         bots = BotEngine.get_all_bots()
         active_bots = [b for b in bots if b.get("token")]
         if not active_bots:
             return False
 
-        # Fetch Cryvex videos
-        v_res = BotEngine.get_channel_videos(self.target_channel_id)
+        # Pick target channel from eligible channels (prioritize ones with lowest completion percentage)
+        target_channel = random.choice(eligible_channels[:max(1, len(eligible_channels) // 2 + 1)])
+        ch_id = target_channel.get("channel_id")
+        ch_name = target_channel.get("name") or "Channel"
+        daily_limit = target_channel.get("daily_limit", 200)
+
+        # Fetch channel videos
+        v_res = BotEngine.get_channel_videos(ch_id)
         videos = v_res.get("videos", [])
         if not videos:
             return False
 
-        # Smart Catalog Balancing:
-        # 60% chance: Pick from lower-viewed pool (least recently viewed among lower half)
-        # 40% chance: Natural rotation across entire catalog
+        # Smart Catalog Balancing
         now = time.time()
         if random.random() < 0.60:
             sorted_by_views = sorted(videos, key=lambda v: v.get("views", 0))
@@ -437,30 +462,36 @@ class AutonomousFarmEngine:
             # 1. Send View
             r_view = requests.post(f"https://bideo.in/api/videos/{vid_id}/view", headers=headers, json={}, timeout=6)
             if r_view.ok:
-                self.state["cryvex_views_today"] += 1
+                if ch_id == DEFAULT_CRYVEX_CHANNEL_ID:
+                    self.state["cryvex_views_today"] += 1
 
-            # 2. Send Watch-Time Retention
+            # 2. Record view in 24h limit manager
+            self.view_limit_mgr.record_view(ch_id, vid_id, title)
+            curr_24h = self.view_limit_mgr.get_views_last_24h(ch_id)
+
+            # 3. Send Watch-Time Retention
             requests.post(f"https://bideo.in/api/videos/{vid_id}/watch-time", headers=headers, json={"watchTime": watch_seconds}, timeout=6)
 
-            action_summary = f"Boosted Cryvex video '{title[:25]}...' ({watch_seconds}s)"
+            action_summary = f"Boosted '{ch_name}' video '{title[:22]}...' ({watch_seconds}s) [{curr_24h}/{daily_limit} 24h Views]"
 
-            # 3. 50% Chance: Like (if not already liked by this bot)
+            # 4. 50% Chance: Like (if not already liked by this bot)
             liked = False
             if (bot_id, vid_id) not in self.liked_pairs and random.random() < self.cryvex_like_chance:
                 r_like = requests.post(f"https://bideo.in/api/videos/{vid_id}/like", headers=headers, json={}, timeout=6)
                 if r_like.ok:
                     liked = True
-                    self.state["cryvex_likes_today"] += 1
+                    if ch_id == DEFAULT_CRYVEX_CHANNEL_ID:
+                        self.state["cryvex_likes_today"] += 1
                     self._record_like(bot_id, bot_name, vid_id)
                     action_summary += " + Liked ❤️"
 
-            # 4. 30% Chance: Positive Comment (STRICT ANTI-DUPLICATE GUARD)
+            # 5. 30% Chance: Positive Comment (STRICT ANTI-DUPLICATE GUARD)
             commented = False
             if (bot_id, vid_id) not in self.commented_pairs and random.random() < self.cryvex_comment_chance:
                 comment_text = random.choice(NATURAL_COMMENTS)
-                # Record comment in memory & Firebase database
                 self._record_comment(bot_id, bot_name, vid_id, title, comment_text)
-                self.state["cryvex_comments_today"] += 1
+                if ch_id == DEFAULT_CRYVEX_CHANNEL_ID:
+                    self.state["cryvex_comments_today"] += 1
                 commented = True
                 action_summary += f" + Commented: \"{comment_text[:20]}...\""
 
@@ -468,14 +499,21 @@ class AutonomousFarmEngine:
             return True
 
         except Exception as e:
-            self._log("Cryvex View Error", str(e), "warning")
+            self._log(f"View Error ({ch_name})", str(e), "warning")
             return False
 
+    def _execute_organic_cryvex_view(self, worker_id=1):
+        """Backward-compatible caller for default channel view."""
+        eligible = self.view_limit_mgr.get_eligible_channels()
+        if not eligible:
+            return False
+        return self._execute_channel_view(eligible, worker_id)
+
     # -------------------------------------------------------------
-    # Stealth Browsing (3rd Party Videos - Anti Detection)
+    # Stealth Browsing (3rd Party Videos - Anti Detection & Free Bots)
     # -------------------------------------------------------------
-    def _execute_stealth_browsing(self):
-        """Bots watch public videos from other creators to maintain natural profile."""
+    def _execute_stealth_browsing(self, is_idle_fallback=False):
+        """Bots watch public videos from other creators to maintain natural profile and like videos."""
         bots = BotEngine.get_all_bots()
         active_bots = [b for b in bots if b.get("token")]
         if not active_bots:
@@ -487,8 +525,11 @@ class AutonomousFarmEngine:
             if not r.ok:
                 return
             public_videos = r.json().get("data", [])
-            # Exclude Cryvex's own videos
-            others = [v for v in public_videos if (v.get("owner") or {}).get("_id") != self.target_channel_id]
+            # Exclude all configured target channels
+            managed_ids = set(self.view_limit_mgr.data.keys())
+            others = [v for v in public_videos if (v.get("owner") or {}).get("_id") not in managed_ids]
+            if not others:
+                others = public_videos
             if not others:
                 return
 
@@ -505,21 +546,23 @@ class AutonomousFarmEngine:
                 "Content-Type": "application/json",
                 "User-Agent": DEFAULT_USER_AGENT
             }
-            watch_seconds = random.randint(15, 35)
+            watch_seconds = random.randint(18, 38)
 
             # View & Watch time
             requests.post(f"https://bideo.in/api/videos/{vid_id}/view", headers=headers, json={}, timeout=6)
             requests.post(f"https://bideo.in/api/videos/{vid_id}/watch-time", headers=headers, json={"watchTime": watch_seconds}, timeout=6)
             self.state["stealth_views_today"] += 1
 
-            stealth_action = f"Browsed public feed -> Watched video by '{creator_name}' ({watch_seconds}s)"
+            reason_str = "All 24H Targets Met" if is_idle_fallback else "Organic Warming"
+            stealth_action = f"Browsed public feed ({reason_str}) -> Watched '{creator_name}' ({watch_seconds}s)"
 
-            # Rare 5-10% chance to like
-            if random.random() < self.stealth_like_chance:
+            # Higher like probability when bots are free/idle (35%), normal (20%)
+            like_prob = 0.35 if is_idle_fallback else self.stealth_like_chance
+            if random.random() < like_prob:
                 requests.post(f"https://bideo.in/api/videos/{vid_id}/like", headers=headers, json={}, timeout=6)
                 stealth_action += " [Organic Like 👍]"
 
-            self._log(f"🌐 Stealth Browse ({bot_name})", stealth_action, "info")
+            self._log(f"🌐 Stealth Browse ({bot_name})", stealth_action, "stealth")
 
-        except Exception:
+        except Exception as e:
             pass
