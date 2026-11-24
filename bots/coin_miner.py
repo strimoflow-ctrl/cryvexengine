@@ -38,6 +38,7 @@ if sys.platform == "win32":
 BIDEO_API_BASE = "https://bideo.in/api"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 FIREBASE_PODIUM_URL = "https://secret-gpt-default-rtdb.asia-southeast1.firebasedatabase.app/bideo_automation/podium_miner.json"
+FIREBASE_ACCOUNTS_URL = "https://secret-gpt-default-rtdb.asia-southeast1.firebasedatabase.app/bideo_automation/accounts"
 
 # ANSI 256 Cyberpunk Console Colors
 CLR_GOLD = "\033[1;38;5;220m"
@@ -275,7 +276,8 @@ class AccountSession:
         self.streams_count = config["streams_count"]
         self.min_buffer_behind = config["min_buffer_behind"]
 
-        self.token = None
+        self.token = config.get("token")
+        self.login_cooldown_until = 0
         self.coins = 0.0
         self.ads_watched = 0
         self.ads_remaining = 16
@@ -294,10 +296,89 @@ class AccountSession:
             "User-Agent": USER_AGENT
         }
 
-    def login(self):
-        """Authenticates with Bideo API and retrieves fresh JWT token."""
+    def validate_token(self, token):
+        """Validates if token is actively accepted by Bideo API."""
+        if not token:
+            return False
+        try:
+            r = requests.get(
+                f"{BIDEO_API_BASE}/auth/me",
+                headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT},
+                timeout=8
+            )
+            if r.ok:
+                data = r.json()
+                user = data.get("data") or data.get("user") or {}
+                if user.get("_id"):
+                    with self.lock:
+                        self.user_id = user.get("_id") or self.user_id
+                        self.username = user.get("name") or user.get("channelName") or self.username
+                return True
+        except Exception:
+            pass
+        return False
+
+    def fetch_firebase_token(self):
+        """Recovers stored JWT token from Firebase Database."""
+        try:
+            if self.user_id:
+                r = requests.get(f"{FIREBASE_ACCOUNTS_URL}/{self.user_id}.json", timeout=6)
+                if r.ok and r.json():
+                    tok = r.json().get("token")
+                    if tok:
+                        return tok
+            r = requests.get(f"{FIREBASE_ACCOUNTS_URL}.json", timeout=6)
+            if r.ok and r.json():
+                for uid, acc in r.json().items():
+                    if isinstance(acc, dict) and acc.get("phone") == self.phone:
+                        return acc.get("token")
+        except Exception:
+            pass
+        return None
+
+    def save_token_to_firebase(self, token):
+        """Caches working JWT token back to Firebase."""
+        try:
+            if self.user_id and token:
+                requests.patch(
+                    f"{FIREBASE_ACCOUNTS_URL}/{self.user_id}.json",
+                    json={"token": token, "updated_at": datetime.now().isoformat()},
+                    timeout=5
+                )
+        except Exception:
+            pass
+
+    def login(self, force=False):
+        """
+        Authenticates with Bideo API or recovers via token / Firebase.
+        Includes anti-lockout cooldown protection to prevent 15-minute rate limits.
+        """
+        now = time.time()
+        if not force and now < self.login_cooldown_until:
+            rem = int(self.login_cooldown_until - now)
+            return False
+
+        # 1. Test existing token if present
+        if self.token:
+            if self.validate_token(self.token):
+                with self.lock:
+                    self.status = "Logged In (Token)"
+                    self.login_cooldown_until = 0
+                return True
+
+        # 2. Try recovering token from Firebase
+        fb_tok = self.fetch_firebase_token()
+        if fb_tok and fb_tok != self.token:
+            if self.validate_token(fb_tok):
+                with self.lock:
+                    self.token = fb_tok
+                    self.status = "Logged In (Firebase Token)"
+                    self.login_cooldown_until = 0
+                return True
+
+        # 3. If password available, attempt fresh API login
         url = f"{BIDEO_API_BASE}/auth/login"
-        payload = {"phone": self.phone, "password": self.password, "login": self.phone}
+        payload = {"phone": self.phone, "password": self.password, "login": self.phone, "username": self.phone}
         headers = {"User-Agent": USER_AGENT, "Content-Type": "application/json"}
         try:
             r = requests.post(url, json=payload, headers=headers, timeout=12)
@@ -309,10 +390,22 @@ class AccountSession:
                     self.user_id = user.get("_id") or self.user_id
                     self.username = user.get("name") or self.username
                     self.status = "Logged In"
+                    self.login_cooldown_until = 0
+                self.save_token_to_firebase(self.token)
                 return True
-            print(f"❌ [{self.label}] Login failed: {data.get('message')}")
+
+            msg = str(data.get("message", ""))
+            # Anti-Lockout Cooldown: Back off if rate limited or invalid password
+            if "15 minutes" in msg or "Too many" in msg:
+                self.login_cooldown_until = now + 900
+                print(f"⚠️ [{self.label}] Bideo 15-min lockout active. Pausing login retries for 15m.")
+            else:
+                self.login_cooldown_until = now + 120
+
+            print(f"❌ [{self.label}] Login failed: {msg}")
             return False
         except Exception as e:
+            self.login_cooldown_until = now + 60
             print(f"❌ [{self.label}] Login exception: {e}")
             return False
 
@@ -324,7 +417,7 @@ class AccountSession:
         try:
             r = requests.get(f"{BIDEO_API_BASE}/boost/status", headers=self.get_headers(), timeout=8)
             if r.status_code in (401, 403):
-                # Token expired, auto-relogin
+                # Token expired, try relogin if cooldown allows
                 if self.login():
                     r = requests.get(f"{BIDEO_API_BASE}/boost/status", headers=self.get_headers(), timeout=8)
 
