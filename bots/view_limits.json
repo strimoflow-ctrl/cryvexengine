@@ -1,7 +1,7 @@
 {
   "_global": {
     "enabled": true,
-    "daily_limit": 100,
+    "daily_limit": 3000,
     "stealth_history": []
   },
   "6ada0b9dfb39968c7c48dd7b": {
@@ -12,5 +12,23 @@
     "enabled": true,
     "daily_limit": 200,
     "history": []
+  },
+  "6ae80c2eff1a527964fd12b8": {
+    "channel_id": "6ae80c2eff1a527964fd12b8",
+    "name": "hariom_ai",
+    "username": "hariom_ai",
+    "avatar": "",
+    "enabled": true,
+    "daily_limit": 1000,
+    "history": []
+  },
+  "6ad9f679fb39968c7c37f8b5": {
+    "channel_id": "6ad9f679fb39968c7c37f8b5",
+    "name": "pankaj_bideo",
+    "username": "pankaj_bideo",
+    "avatar": "",
+    "enabled": true,
+    "daily_limit": 1000,
+    "history": []
   }
-}n b
+}

@@ -264,6 +264,55 @@ def get_podium_status():
     return jsonify({"success": False, "podium": None})
 
 
+@app.route("/api/podium/accounts", methods=["GET"])
+def get_podium_accounts():
+    """Lists all accounts in the coin mining pool."""
+    from coin_miner import PodiumMinerEngine
+    engine = PodiumMinerEngine.get_instance()
+    accounts = []
+    limits_map = engine.limit_mgr.get_all_limits()
+    for a in engine.accounts:
+        accounts.append({
+            "rank": a.rank,
+            "label": a.label,
+            "username": a.username,
+            "phone": a.phone,
+            "coins": round(a.coins, 1),
+            "enabled": limits_map.get(a.username, {}).get("enabled", True),
+            "daily_limit": limits_map.get(a.username, {}).get("daily_limit", 50.0),
+            "mined_24h": limits_map.get(a.username, {}).get("mined_24h", 0.0),
+            "status": a.status
+        })
+    return jsonify({"success": True, "accounts": accounts})
+
+
+@app.route("/api/podium/accounts", methods=["POST"])
+def add_podium_account():
+    """Authenticates and adds a new account to coin mining."""
+    body = request.get_json() or {}
+    phone = str(body.get("phone", "")).strip()
+    password = str(body.get("password", "")).strip()
+    daily_limit = float(body.get("daily_limit", 50.0))
+    streams_count = int(body.get("streams_count", 2))
+
+    if not phone or not password:
+        return jsonify({"success": False, "message": "Phone number aur Password dono zaroori hain!"}), 400
+
+    from coin_miner import PodiumMinerEngine
+    engine = PodiumMinerEngine.get_instance()
+    ok, msg = engine.add_account(phone, password, daily_limit=daily_limit, streams_count=streams_count)
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/podium/accounts/<username>", methods=["DELETE"])
+def remove_podium_account(username):
+    """Removes an account from coin mining."""
+    from coin_miner import PodiumMinerEngine
+    engine = PodiumMinerEngine.get_instance()
+    ok, msg = engine.remove_account(username)
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+
 @app.route("/api/farm/status", methods=["GET"])
 def get_farm_status():
     status = AutonomousFarmEngine.get_instance().get_status()
@@ -402,6 +451,30 @@ def toggle_global_views():
         res = mgr.update_global_config(enabled=new_val)
         summary = mgr.get_all_channels_summary()
         return jsonify({"success": True, "message": "Global switch updated!", "data": res, **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/global/reset", methods=["POST"])
+def reset_global_views():
+    """Instantly clears all 24h rolling view history across all channels and stealth views."""
+    try:
+        mgr = ViewLimitManager.get_instance()
+        mgr.reset_history()
+        summary = mgr.get_all_channels_summary()
+        return jsonify({"success": True, "message": "All 24h view counters reset to 0!", **summary})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/views/channels/<channel_id>/reset", methods=["POST"])
+def reset_channel_views(channel_id):
+    """Instantly clears 24h rolling view history for a specific channel."""
+    try:
+        mgr = ViewLimitManager.get_instance()
+        mgr.reset_history(channel_id=channel_id)
+        summary = mgr.get_all_channels_summary()
+        return jsonify({"success": True, "message": f"Channel 24h view counter reset to 0!", **summary})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 

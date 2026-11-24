@@ -40,7 +40,7 @@ class ViewLimitManager:
         return {
             "_global": {
                 "enabled": True,
-                "daily_limit": 100,
+                "daily_limit": 3000,
                 "stealth_history": []
             },
             DEFAULT_CRYVEX_CHANNEL_ID: {
@@ -134,6 +134,23 @@ class ViewLimitManager:
 
         if changed:
             self._save()
+
+    def reset_history(self, channel_id=None):
+        """Clears 24h rolling history for all channels or a specific channel."""
+        with self.lock:
+            self.data = self._load()
+            if channel_id and channel_id != "_global":
+                if channel_id in self.data:
+                    self.data[channel_id]["history"] = []
+            else:
+                # Reset all channels and stealth history
+                g = self.data.setdefault("_global", {"enabled": True, "daily_limit": 3000, "stealth_history": []})
+                g["stealth_history"] = []
+                for k, v in self.data.items():
+                    if k != "_global" and isinstance(v, dict):
+                        v["history"] = []
+            self._save()
+            return True
 
     # -------------------------------------------------------------
     # Global Limit & Master Switch Methods

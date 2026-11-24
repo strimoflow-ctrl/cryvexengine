@@ -212,12 +212,33 @@ class MiningLimitManager:
                 "mined_24h": round(mined_24h, 1)
             }
 
+    def add_account_limit(self, username, daily_limit=50.0):
+        with self.lock:
+            self.data = self._load()
+            if username not in self.data:
+                self.data[username] = {
+                    "enabled": True,
+                    "daily_limit": float(daily_limit),
+                    "history": []
+                }
+                self._save()
+            return True
+
+    def remove_account_limit(self, username):
+        with self.lock:
+            self.data = self._load()
+            if username in self.data and username != "cryvex":
+                del self.data[username]
+                self._save()
+                return True
+            return False
+
     def get_all_limits(self):
         with self.lock:
             self.data = self._load()
             self.prune_history()
             res = {}
-            for u in ["cryvex", "pankaj_bideo", "hariom_ai"]:
+            for u in list(self.data.keys()):
                 user_data = self.data.get(u, {"enabled": True, "daily_limit": 100.0, "history": []})
                 enabled = user_data.get("enabled", True)
                 limit = float(user_data.get("daily_limit", 100.0))
@@ -408,6 +429,9 @@ class AccountSession:
             return False, 0
 
 
+MINING_ACCOUNTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mining_accounts.json")
+
+
 class PodiumMinerEngine:
     _instance = None
     _lock = threading.Lock()
@@ -420,7 +444,9 @@ class PodiumMinerEngine:
             return cls._instance
 
     def __init__(self):
-        self.accounts = [AccountSession(cfg) for cfg in PODIUM_CONFIG]
+        self.accounts_file = MINING_ACCOUNTS_FILE
+        self.accounts_config = self._load_accounts_config()
+        self.accounts = [AccountSession(cfg) for cfg in self.accounts_config]
         self.limit_mgr = MiningLimitManager.get_instance()
         self.running = False
         self.video_catalog = []
@@ -428,6 +454,122 @@ class PodiumMinerEngine:
         self.last_catalog_refresh = 0
         self.logs = deque(maxlen=40)
         self.log_lock = threading.Lock()
+
+    def _load_accounts_config(self):
+        if os.path.exists(self.accounts_file):
+            try:
+                with open(self.accounts_file, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    if isinstance(cfg, list) and len(cfg) > 0:
+                        return cfg
+            except Exception as e:
+                print(f"⚠️ [Podium Miner] Load accounts error: {e}")
+        self._save_accounts_config(PODIUM_CONFIG)
+        return PODIUM_CONFIG
+
+    def _save_accounts_config(self, cfg_list):
+        try:
+            with open(self.accounts_file, "w", encoding="utf-8") as f:
+                json.dump(cfg_list, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ [Podium Miner] Save accounts error: {e}")
+
+    def add_account(self, phone, password, daily_limit=50.0, streams_count=2):
+        """Authenticates and adds a new account to 24/7 coin mining."""
+        phone = str(phone).strip()
+        password = str(password).strip()
+        if not phone or not password:
+            return False, "Phone and Password are required!"
+
+        for a in self.accounts:
+            if a.phone == phone:
+                return False, f"Account with phone {phone} is already in the mining pool!"
+
+        test_session = AccountSession({
+            "rank": len(self.accounts) + 1,
+            "label": f"⚡ Miner {len(self.accounts) + 1}",
+            "username": phone,
+            "phone": phone,
+            "password": password,
+            "user_id": "",
+            "streams_count": int(streams_count),
+            "min_buffer_behind": 200
+        })
+
+        if not test_session.login():
+            return False, "Login failed! Please check Phone and Password."
+
+        test_session.refresh_coins_status()
+        username = test_session.username
+
+        new_cfg = {
+            "rank": len(self.accounts) + 1,
+            "label": f"⚡ Miner {len(self.accounts) + 1}",
+            "username": username,
+            "phone": phone,
+            "password": password,
+            "user_id": test_session.user_id,
+            "streams_count": int(streams_count),
+            "min_buffer_behind": 200
+        }
+
+        self.accounts_config.append(new_cfg)
+        self._save_accounts_config(self.accounts_config)
+        self.limit_mgr.add_account_limit(username, daily_limit=daily_limit)
+        self.accounts.append(test_session)
+
+        if self.running:
+            t_ad = threading.Thread(target=self._ad_claim_worker, args=(test_session,), daemon=True)
+            t_ad.start()
+            for s_id in range(1, test_session.streams_count + 1):
+                t_stream = threading.Thread(target=self._streaming_watch_worker, args=(test_session, s_id), daemon=True)
+                t_stream.start()
+
+        self.add_log("⚡ NEW MINER ADDED", f"{username} ({phone}) joined mining pool with {daily_limit} coins budget!", "coin-reward")
+        self.sync_podium_state()
+        return True, f"Account '{username}' added successfully to 24/7 coin miner!"
+
+    def remove_account(self, username_or_phone):
+        """Removes a non-master account from coin mining."""
+        target = None
+        for a in self.accounts:
+            if a.username == username_or_phone or a.phone == username_or_phone:
+                target = a
+                break
+
+        if not target:
+            return False, "Account not found in mining pool"
+
+        if target.username == "cryvex":
+            return False, "Cannot delete master apex leader (cryvex)!"
+
+        self.accounts = [a for a in self.accounts if a != target]
+        self.accounts_config = [c for c in self.accounts_config if c.get("username") != target.username and c.get("phone") != target.phone]
+        for idx, acc in enumerate(self.accounts):
+            acc.rank = idx + 1
+            if idx == 0:
+                acc.label = "🥇 Rank 1"
+            elif idx == 1:
+                acc.label = "🥈 Rank 2"
+            elif idx == 2:
+                acc.label = "🥉 Rank 3"
+            else:
+                acc.label = f"⚡ Miner {idx + 1}"
+        for idx, cfg in enumerate(self.accounts_config):
+            cfg["rank"] = idx + 1
+            if idx == 0:
+                cfg["label"] = "🥇 Rank 1"
+            elif idx == 1:
+                cfg["label"] = "🥈 Rank 2"
+            elif idx == 2:
+                cfg["label"] = "🥉 Rank 3"
+            else:
+                cfg["label"] = f"⚡ Miner {idx + 1}"
+
+        self._save_accounts_config(self.accounts_config)
+        self.limit_mgr.remove_account_limit(target.username)
+        self.sync_podium_state()
+        return True, f"Account '{target.username}' removed from mining pool!"
 
     def add_log(self, title, message, category="info"):
         now_str = datetime.now().strftime("%H:%M:%S")

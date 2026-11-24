@@ -223,6 +223,22 @@
           <div class="podium-lead-tag text-purple">⚡ HOLDING #3 BEHIND PANKAJ</div>
         </div>
       </div>
+
+      <!-- EXTRA DYNAMIC MINING ACCOUNTS GRID -->
+      <div id="extraMinersGrid" class="extra-miners-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 16px;"></div>
+
+      <!-- ADD MINING ACCOUNT FORM -->
+      <div class="add-miner-bar" style="margin-top: 20px; padding: 16px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <div style="font-weight: 700; color: #fbbf24; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+          <span>⚡ ADD NEW MINER:</span>
+        </div>
+        <input type="text" id="newMinerPhone" class="cyber-input" placeholder="Phone Number (e.g. 9876543210)" style="flex: 1; min-width: 150px; padding: 8px 12px; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+        <input type="password" id="newMinerPassword" class="cyber-input" placeholder="Password" style="flex: 1; min-width: 130px; padding: 8px 12px; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+        <input type="number" id="newMinerLimit" class="cyber-input" value="50" min="5" step="5" placeholder="Daily Coins" style="width: 100px; padding: 8px 12px; background: #0b1120; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;">
+        <button id="addMinerBtn" class="btn btn-cyber-gold btn-sm" style="padding: 8px 18px; font-weight: bold; background: #f59e0b; color: #000; border: none; border-radius: 8px; cursor: pointer;">
+          <span>+ ADD MINER</span>
+        </button>
+      </div>
     </section>
 
     <!-- ============================================================= -->
@@ -284,6 +300,9 @@
             </div>
             <button id="saveGlobalLimitBtn" class="btn btn-cyber-cyan btn-sm">
               <span class="btn-text">SAVE BUDGET</span>
+            </button>
+            <button id="resetGlobalViewsBtn" class="btn btn-cyber-sm" style="border-color: rgba(245, 158, 11, 0.6); color: #fbbf24;" title="Reset rolling 24-hour view count to 0 immediately">
+              <span>🔄 RESET 24H COUNTER</span>
             </button>
           </div>
 

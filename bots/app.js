@@ -109,6 +109,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
+      // Render Extra Miners (> Rank 3)
+      const extraGrid = document.getElementById('extraMinersGrid');
+      if (extraGrid) {
+        const extraAccounts = accounts.filter(a => a.rank > 3);
+        if (extraAccounts.length === 0) {
+          extraGrid.innerHTML = '';
+        } else {
+          extraGrid.innerHTML = extraAccounts.map(acc => {
+            const mined = Number(acc.mined_24h || 0);
+            const limit = Number(acc.daily_limit || 50);
+            const pct = limit > 0 ? Math.min(100, Math.round((mined / limit) * 100)) : 100;
+            const coinsStr = Number(acc.coins || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const isPaused = acc.enabled === false;
+            const isLimit = limit > 0 && mined >= limit;
+            const badgeClass = isPaused ? 'ctrl-status-badge paused' : (isLimit ? 'ctrl-status-badge limit' : 'ctrl-status-badge active');
+            const badgeText = isPaused ? '⏸️ PAUSED' : (isLimit ? '⚠️ LIMIT REACHED' : '🟢 MINING ACTIVE');
+            return `
+              <div class="podium-card extra-miner-card" style="border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 14px; background: rgba(15, 23, 42, 0.85);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span class="meta-pill" style="color: #fbbf24; font-weight: bold;">${acc.label || ('Miner #' + acc.rank)}</span>
+                  <button class="btn-remove-miner" data-user="${acc.username}" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem; font-weight: bold;" title="Remove Miner">🗑️ Remove</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div>
+                    <h4 style="margin: 0; color: #fff; font-size: 1rem;">${acc.username}</h4>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">${acc.phone}</span>
+                  </div>
+                  <div style="text-align: right;">
+                    <span style="font-size: 1.15rem; font-weight: bold; color: #fbbf24;">${coinsStr}</span>
+                    <span style="font-size: 0.75rem; color: #94a3b8; display: block;">COINS</span>
+                  </div>
+                </div>
+                <div class="podium-controls-box" style="margin-top: 8px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                  <div class="ctrl-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="ctrl-label" style="font-size: 0.75rem;">⚡ 24H BUDGET:</span>
+                    <label class="cyber-switch">
+                      <input type="checkbox" class="toggle-extra-miner" data-user="${acc.username}" ${!isPaused ? 'checked' : ''}>
+                      <span class="cyber-slider"></span>
+                    </label>
+                  </div>
+                  <div class="ctrl-limit-row" style="display: flex; gap: 8px; margin: 8px 0;">
+                    <input type="number" class="limit-input-extra cyber-input-limit" data-user="${acc.username}" value="${limit}" min="0" step="5" style="width: 80px;">
+                    <button class="btn-save-extra-limit" data-user="${acc.username}" style="padding: 4px 10px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">SAVE</button>
+                  </div>
+                  <div class="ctrl-progress-row">
+                    <div class="ctrl-bar-track" style="height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden;">
+                      <div class="ctrl-bar-fill gold-fill" style="width: ${pct}%; height: 100%; background: #f59e0b;"></div>
+                    </div>
+                    <span class="ctrl-mined-txt" style="font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 4px;">${mined.toFixed(1)} / ${limit} Coins</span>
+                  </div>
+                  <div class="${badgeClass}" style="margin-top: 6px; font-size: 0.75rem;">${badgeText}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
       // Update Live Terminal Logs
       if (Array.isArray(pod.recent_logs) && pod.recent_logs.length > 0) {
         cachedLogs = pod.recent_logs;
@@ -363,6 +421,124 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Handle Add Miner Account
+  const addMinerBtn = document.getElementById('addMinerBtn');
+  const newMinerPhone = document.getElementById('newMinerPhone');
+  const newMinerPassword = document.getElementById('newMinerPassword');
+  const newMinerLimit = document.getElementById('newMinerLimit');
+
+  if (addMinerBtn) {
+    addMinerBtn.addEventListener('click', async () => {
+      const phone = newMinerPhone ? newMinerPhone.value.trim() : '';
+      const password = newMinerPassword ? newMinerPassword.value.trim() : '';
+      const daily_limit = newMinerLimit ? Number(newMinerLimit.value) : 50;
+
+      if (!phone || !password) {
+        alert('Kripya Phone Number aur Password dono enter karein!');
+        return;
+      }
+
+      const origText = addMinerBtn.innerHTML;
+      addMinerBtn.innerHTML = '<span>ADDING...</span>';
+      addMinerBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/podium/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, password, daily_limit })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ ' + (data.message || 'Miner added successfully!'));
+          if (newMinerPhone) newMinerPhone.value = '';
+          if (newMinerPassword) newMinerPassword.value = '';
+          loadPodiumStatus();
+        } else {
+          alert('⚠️ ' + (data.message || 'Failed to add miner'));
+        }
+      } catch (err) {
+        console.error('Add miner error:', err);
+        alert('⚠️ Network error while adding miner');
+      } finally {
+        addMinerBtn.innerHTML = origText;
+        addMinerBtn.disabled = false;
+      }
+    });
+  }
+
+  // Handle Extra Miners Delegation (Remove, Toggle, Limit Save)
+  const extraMinersGrid = document.getElementById('extraMinersGrid');
+  if (extraMinersGrid) {
+    extraMinersGrid.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-remove-miner')) {
+        const user = e.target.dataset.user;
+        if (!confirm(`Are you sure you want to remove miner '${user}'?`)) return;
+        try {
+          const res = await fetch(`/api/podium/accounts/${encodeURIComponent(user)}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            loadPodiumStatus();
+          } else {
+            alert('⚠️ ' + (data.message || 'Failed to remove miner'));
+          }
+        } catch (err) {
+          console.error('Remove miner error:', err);
+        }
+      }
+
+      if (e.target.classList.contains('btn-save-extra-limit')) {
+        const user = e.target.dataset.user;
+        const card = e.target.closest('.extra-miner-card');
+        const input = card ? card.querySelector('.limit-input-extra') : null;
+        const toggle = card ? card.querySelector('.toggle-extra-miner') : null;
+        const limit = input ? Number(input.value) : 50;
+        const enabled = toggle ? toggle.checked : true;
+
+        const origText = e.target.textContent;
+        e.target.textContent = 'SAVED!';
+        e.target.style.background = '#10B981';
+
+        try {
+          await fetch('/api/miner/limits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, enabled, daily_limit: limit })
+          });
+          loadPodiumStatus();
+        } catch (err) {
+          console.error('Save extra limit error:', err);
+        } finally {
+          setTimeout(() => {
+            e.target.textContent = origText;
+            e.target.style.background = '';
+          }, 1200);
+        }
+      }
+    });
+
+    extraMinersGrid.addEventListener('change', async (e) => {
+      if (e.target.classList.contains('toggle-extra-miner')) {
+        const user = e.target.dataset.user;
+        const enabled = e.target.checked;
+        const card = e.target.closest('.extra-miner-card');
+        const input = card ? card.querySelector('.limit-input-extra') : null;
+        const limit = input ? Number(input.value) : 50;
+
+        try {
+          await fetch('/api/miner/limits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, enabled, daily_limit: limit })
+          });
+          loadPodiumStatus();
+        } catch (err) {
+          console.error('Toggle extra miner error:', err);
+        }
+      }
+    });
+  }
+
   // -------------------------------------------------------------
   // 5c. 24H View Limits & Multi-Channel Automation Controls
   // -------------------------------------------------------------
@@ -382,6 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const globalSwitchLabel = document.getElementById('globalSwitchLabel');
   const globalLimitInput = document.getElementById('globalLimitInput');
   const saveGlobalLimitBtn = document.getElementById('saveGlobalLimitBtn');
+  const resetGlobalViewsBtn = document.getElementById('resetGlobalViewsBtn');
   const globalViewsProgressTxt = document.getElementById('globalViewsProgressTxt');
   const globalBreakdownTxt = document.getElementById('globalBreakdownTxt');
   const globalBarFill = document.getElementById('globalBarFill');
@@ -754,6 +931,31 @@ document.addEventListener('DOMContentLoaded', () => {
           saveGlobalLimitBtn.style.background = '';
           saveGlobalLimitBtn.style.color = '';
         }, 1200);
+      }
+    });
+  }
+
+  if (resetGlobalViewsBtn) {
+    resetGlobalViewsBtn.addEventListener('click', async () => {
+      const origText = resetGlobalViewsBtn.innerHTML;
+      resetGlobalViewsBtn.innerHTML = '<span>RESETTING...</span>';
+      try {
+        const res = await fetch('/api/views/global/reset', { method: 'POST' });
+        const data = await res.json();
+        if (data && data.success) {
+          resetGlobalViewsBtn.innerHTML = '<span>CLEARED!</span>';
+          resetGlobalViewsBtn.style.borderColor = '#10B981';
+          resetGlobalViewsBtn.style.color = '#10B981';
+          loadViewChannels();
+        }
+      } catch (err) {
+        console.error('Reset global views error:', err);
+      } finally {
+        setTimeout(() => {
+          resetGlobalViewsBtn.innerHTML = origText;
+          resetGlobalViewsBtn.style.borderColor = '';
+          resetGlobalViewsBtn.style.color = '';
+        }, 1500);
       }
     });
   }
