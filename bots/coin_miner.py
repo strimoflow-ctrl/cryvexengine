@@ -61,7 +61,7 @@ PODIUM_CONFIG = [
         "phone": "7052733069",
         "password": "pankaj@5911",
         "user_id": "6ada0b9dfb39968c7c48dd7b",
-        "streams_count": 2,      # Concurrent streaming tabs
+        "streams_count": 4,      # 4 Concurrent streaming tabs for maximum speed
         "min_buffer_behind": 0   # Apex leader (no cap)
     },
     {
@@ -71,8 +71,8 @@ PODIUM_CONFIG = [
         "phone": "9115233706",
         "password": "pankaj@5911",
         "user_id": "6ad9f679fb39968c7c37f8b5",
-        "streams_count": 2,
-        "min_buffer_behind": 200  # Must stay at least 200 coins below Rank 1
+        "streams_count": 3,
+        "min_buffer_behind": 0   # Independent mining
     },
     {
         "rank": 3,
@@ -81,8 +81,8 @@ PODIUM_CONFIG = [
         "phone": "9648083419",
         "password": "hariom65",
         "user_id": "6ae80c2eff1a527964fd12b8",
-        "streams_count": 2,
-        "min_buffer_behind": 200  # Must stay at least 200 coins below Rank 2
+        "streams_count": 3,
+        "min_buffer_behind": 0   # Independent mining
     }
 ]
 
@@ -793,31 +793,15 @@ class PodiumMinerEngine:
                     time.sleep(10)
                     continue
 
-                # Hierarchy Safety Check:
-                # Rank 2 must never overtake Rank 1 (Cryvex stays apex)
-                # Rank 3 must never overtake Rank 2 (Pankaj stays #2)
-                if acc.rank == 2:
-                    rank1_acc = self.accounts[0]
-                    if acc.coins >= (rank1_acc.coins - 50):
-                        acc.status = "Pacing (Holding #2 behind Rank 1)"
-                        time.sleep(15)
-                        continue
-                elif acc.rank == 3:
-                    rank2_acc = self.accounts[1]
-                    if acc.coins >= rank2_acc.coins:
-                        acc.status = "Pacing (Holding #3 behind Rank 2)"
-                        time.sleep(15)
-                        continue
-
                 acc.status = f"Streaming #{stream_id} ({mined_24h:.0f}/{limit:.0f} 24h)"
 
                 target = self.get_target_video(acc.user_id)
                 if not target:
-                    time.sleep(10)
+                    time.sleep(6)
                     continue
 
-                # Watch time between 62 and 68 seconds to guarantee +1 Coin credit
-                watch_duration = random.randint(62, 68)
+                # Watch time between 61 and 64 seconds to guarantee +1 Coin credit
+                watch_duration = random.randint(61, 64)
 
                 # Simulate real-time watching
                 slept = 0
@@ -837,8 +821,8 @@ class PodiumMinerEngine:
                     self.add_log(f"🪙 COIN MINED [{acc.label}]", f"[Stream #{stream_id}] Watched '{target['title'][:22]}...' ({watch_duration}s) ──► +{earned}.0 Coin | Vault: {acc.coins:.1f}", "coin-reward")
                     self.sync_podium_state()
 
-                # Short realistic human gap between videos (3 to 7 seconds)
-                time.sleep(random.randint(3, 7))
+                # Fast smooth gap between videos (2 to 4 seconds)
+                time.sleep(random.randint(2, 4))
 
             except Exception as e:
                 time.sleep(10)

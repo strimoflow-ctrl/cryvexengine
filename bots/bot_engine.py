@@ -59,14 +59,42 @@ class BotEngine:
 
     @classmethod
     def get_cryvex_token(cls):
-        """Fetches Cryvex account token from Firebase."""
+        """Fetches Cryvex account token from Firebase, local mining accounts, or auto-logins."""
         try:
-            r = requests.get(cls._firebase_url(f"accounts/{DEFAULT_CRYVEX_CHANNEL_ID}"), timeout=6)
+            r = requests.get(cls._firebase_url(f"accounts/{DEFAULT_CRYVEX_CHANNEL_ID}"), timeout=5)
             if r.ok and r.json():
-                return r.json().get("token")
-            return None
+                tok = r.json().get("token")
+                if tok:
+                    return tok
         except Exception:
-            return None
+            pass
+
+        # Fallback to local mining accounts
+        try:
+            acc_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mining_accounts.json")
+            if os.path.exists(acc_file):
+                with open(acc_file, "r", encoding="utf-8") as f:
+                    accs = json.load(f)
+                    for a in accs:
+                        if a.get("username") == "cryvex" and a.get("token"):
+                            return a.get("token")
+        except Exception:
+            pass
+
+        # Final fallback: Direct API Login
+        try:
+            r_login = requests.post(
+                f"{BIDEO_API_BASE}/auth/login",
+                json={"phone": "7052733069", "password": "pankaj@5911", "login": "7052733069"},
+                headers={"Content-Agent": USER_AGENT, "Content-Type": "application/json"},
+                timeout=8
+            )
+            if r_login.ok and r_login.json().get("token"):
+                return r_login.json().get("token")
+        except Exception:
+            pass
+
+        return None
 
     # ---------------------------------------------------------
     # Account Generation Logic

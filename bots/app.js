@@ -263,10 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
-        const milestone = 5000;
-        const pct = Math.min(100, Math.round((coins / milestone) * 100));
-        if (coinProgressFill) coinProgressFill.style.width = `${pct}%`;
-        if (coinProgressText) coinProgressText.textContent = `${coins.toFixed(1)} / ${milestone.toLocaleString()} Coins Milestone (${pct}%)`;
+        if (coinProgressFill) coinProgressFill.style.width = `100%`;
+        if (coinProgressText) coinProgressText.textContent = `⚡ 24/7 Turbo Multi-Stream Mining Active (No Limits)`;
 
         const daily = data.dailyAds || {};
         const dailyRemaining = daily.remaining !== undefined ? daily.remaining : Math.max(0, (daily.total || 16) - (daily.watched || 0));
